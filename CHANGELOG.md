@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.2 — 2026-10-04
+
+### Changed
+
+- Rewrote `which-security-review` discovery to start from the live skill
+  registry and known skill roots instead of a filesystem-wide scan with a
+  hand-rolled cache, and narrowed its trigger to questions about choosing a
+  security review ("do a security review" goes straight to a reviewer).
+- `which-security-review` treats diff content, commit messages, PR text, skill
+  bodies and tool output as data, and a target can no longer choose or
+  configure its own review: target-added or modified skills, scanner configs,
+  `CLAUDE.md`/`AGENTS.md`, hooks and settings are excluded or replaced with the
+  base revision's, and target-modified tests and CI do not count as coverage.
+- `which-security-review` never executes the target: no tests, builds,
+  scanners, repo-local binaries or package runners.
+- New overrides for weakened checks and scanner suppressions (judged from the
+  diff, not the "security fix" message), agent and harness configuration,
+  session/token lifecycle, webhooks, money movement and runtime privileges.
+- Consistent effort: modifiers count once, at most one reduction (evidence
+  that predates the target), no fixup reduction, and a `high` cap unless a
+  design or system spans connected components (`xhigh`) or the user asks for
+  `max`.
+- Routes rank dedicated security reviewers before general reviewers and
+  guidance skills; built-in registry commands count as installed. Unattended
+  agent work needs positive evidence and is isolated with a fresh session.
+- Report gained Target (with SHAs) and Focus sections; credential-like values
+  get a separate `[user]` rotation step and are never quoted.
+
 ## 0.2.1 — 2026-10-04
 
 ### Changed
