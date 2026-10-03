@@ -25,16 +25,6 @@ List this library's skills without installing:
 npx skills@latest add hristokbonev/which-way --list
 ```
 
-### Choose scope
-
-Installation defaults to the current project. Add `--global` to install for
-your user account across projects:
-
-```sh
-npx skills@latest add hristokbonev/which-way \
-  --agent codex --skill which-framework --global
-```
-
 The CLI offers symlink or copy installation. Add `--copy` for independent
 copies and `--yes` to skip confirmation prompts when scripting an explicit
 selection.
