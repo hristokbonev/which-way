@@ -31,11 +31,12 @@ async function statIfPresent(path) {
 
 export async function installSkills({ names: selected, destination, force = false }) {
   if (!isAbsolute(destination)) throw new Error(`Destination must be absolute: ${destination}`);
+  const skillRoot = resolve(destination);
   const namesToInstall = [...new Set(selected)];
   const sources = namesToInstall.map((name) => ({ name, source: skillDirectory(name) }));
-  const rootInfo = await statIfPresent(destination);
-  if (rootInfo?.isSymbolicLink()) throw new Error(`Destination is a symlink: ${destination}`);
-  if (rootInfo && !rootInfo.isDirectory()) throw new Error(`Destination is not a directory: ${destination}`);
+  const rootInfo = await statIfPresent(skillRoot);
+  if (rootInfo?.isSymbolicLink()) throw new Error(`Destination is a symlink: ${skillRoot}`);
+  if (rootInfo && !rootInfo.isDirectory()) throw new Error(`Destination is not a directory: ${skillRoot}`);
 
   for (const { name, source } of sources) {
     const sourceInfo = await statIfPresent(source);
@@ -43,17 +44,17 @@ export async function installSkills({ names: selected, destination, force = fals
     if (!sourceInfo?.isDirectory() || !manifestInfo?.isFile()) {
       throw new Error(`Bundled skill is missing or invalid: ${source}`);
     }
-    const target = join(destination, name);
+    const target = join(skillRoot, name);
     const targetInfo = await statIfPresent(target);
     if (targetInfo?.isSymbolicLink()) throw new Error(`Skill destination is a symlink: ${target}`);
     if (targetInfo && !targetInfo.isDirectory()) throw new Error(`Skill destination is not a directory: ${target}`);
     if (targetInfo && !force) throw new Error(`Skill destination already exists: ${target}`);
   }
 
-  await mkdir(destination, { recursive: true });
+  await mkdir(skillRoot, { recursive: true });
   const installed = [];
   for (const { name, source } of sources) {
-    const target = join(destination, name);
+    const target = join(skillRoot, name);
     if (force) await rm(target, { recursive: true, force: true });
     await cp(source, target, { recursive: true, errorOnExist: true, force: false });
     installed.push(target);

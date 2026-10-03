@@ -62,6 +62,21 @@ test('rejects symlink skill roots, including dangling links', async () => {
   await assert.rejects(installSkills({ names: ['which-framework'], destination: dangling }), /symlink/);
 });
 
+test('rejects absolute symlink skill root with a trailing slash', async () => {
+  const parent = await fixture();
+  const outside = join(parent, 'outside');
+  const destination = join(parent, 'skills');
+  await mkdir(outside);
+  await writeFile(join(outside, 'sentinel'), 'keep');
+  await symlink(outside, destination);
+  await assert.rejects(
+    installSkills({ names: ['which-framework'], destination: `${destination}/`, force: true }),
+    /symlink/,
+  );
+  assert.equal(await readFile(join(outside, 'sentinel'), 'utf8'), 'keep');
+  await assert.rejects(lstat(join(outside, 'which-framework')), /ENOENT/);
+});
+
 test('rejects symlink skill directories and regular files', async () => {
   const parent = await fixture();
   const destination = join(parent, 'skills');
