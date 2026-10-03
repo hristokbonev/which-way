@@ -25,6 +25,12 @@
   live skill registry plus a frontmatter scan of skill roots (so user-only skills
   are still found), shortlists two or three finalists per phase, reads invocation
   restrictions from frontmatter, and no longer recommends itself as a next step.
+- `which-framework` follows symlinked skill roots when scanning for user-only
+  skills, stops reading when more reading would cost more than the decision is
+  worth, and lets users widen a shortlist of skills they named.
+- `which-framework` answers questions about routing itself with a "needs a
+  concrete task" verdict before running discovery, and puts its finalist table
+  in the report.
 - Rewrote `which-codereview` discovery to start from the live skill registry and
   known skill roots instead of a filesystem-wide scan with a hand-rolled cache,
   and narrowed its trigger to reviewer-choice questions.
