@@ -1,6 +1,14 @@
 # which-way
 
-Three agent skills for choosing the next workflow or reviewer:
+> Lost among your agent skills? Which way is the way to go? which-way is the way to go!
+
+You have dozens of skills installed and a task in front of you. Several skills
+overlap, a few would pull in opposite directions, and you're not sure whether
+the change needs a review at all. which-way gives you the route: which skills to
+run, in what order, and how deep to go. Sometimes the answer is "none, just do
+it."
+
+Agent skills for choosing the next workflow or reviewer:
 
 - **which-framework** recommends an installed skill or workflow for a task.
 - **which-codereview** recommends whether and how to review a code change.
