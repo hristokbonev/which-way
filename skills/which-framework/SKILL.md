@@ -1,145 +1,138 @@
 ---
 name: which-framework
-description: Use when the user asks to choose or compare skills or workflows, resolve overlapping options, or assess whether a skill is needed. Reports a recommendation without invoking selected skills or starting execution. Ordinary requests to perform work do not trigger this router merely because skills overlap.
+description: Use when the user asks to choose or compare skills or workflows, resolve overlapping options, or assess whether a skill is needed. Reports a recommendation without invoking selected skills or starting execution. Ordinary requests to perform work do not trigger this router merely because skills overlap. For choosing a code reviewer or security reviewer specifically, use which-codereview or which-security-review instead.
 ---
 
-Choose a locally available skill, a minimal chain, a per-workspace route, "split first", "no suitable local route found", or "none — just do it" for the specific task. **Report only: do not invoke selected skills or begin the requested work.** No application, collection, publisher, namespace, or directory owns a task category by default.
+Choose a route for the specific task: one skill, a minimal chain, a per-workspace chain, "split first", "no suitable local route found", or "none — just do it". **Report only: do not invoke selected skills or begin the requested work.** Judge every candidate by its installed instructions; no publisher, collection, namespace, or directory gets preference.
 
 ## Step 0 — Triage gate
 
-Classify the ask before discovering candidates. Use **"none — just do it"** when the task is routine, low consequence, sufficiently understood, and has no unresolved decision or specialist verification need. Examples include a harmless typo, a mechanical edit, or a simple explanation answerable from available evidence.
+Classify the ask before discovering candidates.
 
-Assess consequences and uncertainty rather than edit size. A config value, version bump, rename, or single line can affect security, compatibility, data, or deployment. An explanatory question can require research. A formatter, linter, or typechecker covers only the properties it checks; its presence does not establish that the whole task is routine.
+### Exit 1 — "none — just do it"
 
-For a qualifying task, report the verdict only and stop before discovery.
+Use when the task is routine, low consequence, understood, and has no unresolved decision or specialist verification need: a typo, a mechanical edit, an explanation answerable from available evidence.
 
-### The second exit — "split it first"
+Judge consequence and uncertainty, not size. A one-line config change, version bump, or rename can affect security, compatibility, data, or deployment. An explanatory question can need research. A formatter, linter, or typechecker covers only what it checks.
 
-A task can be too *mixed* to route rather than too small. Routing a bundle picks one member's shape and imposes it on the rest: the open-ended part gets a plan before anyone decided anything, and the settled part gets an interrogation it doesn't need. **Verdict: "split first" — name the split, route nothing, stop.**
+Report the verdict and stop.
 
-Assess whether the parts need separate routes using these signals:
+### Exit 2 — "split first"
 
-- **Mixed decision state.** Some behavior or vendor choices remain open while other parts are fully specified.
-- **A blocked sub-item.** A seemingly mechanical part depends on an unresolved decision, as shown by the repo or docs.
-- **Different reviewer.** Parts require different expertise or approvals.
-- **Different definition of done.** Parts require different verification or acceptance evidence.
+Routing a mixed bundle imposes one part's workflow on the rest: the open part gets planned before anything is decided, and the settled part gets an interview it doesn't need.
 
-These are signals, not a vote or automatic split threshold. Different reviewers or verification methods can belong to one coherent deliverable. Treat work as phased when the parts serve a shared outcome and can be handled by an ordered or per-workspace route. Choose **"split first"** only when separate scopes are necessary to avoid incompatible assumptions, premature work on a blocked part, or independently deliverable work being forced through one workflow.
+Split signals:
 
-Report the parts, dependencies, and likely capability for each. Require the user to choose a part only when an unresolved priority or scope decision actually prevents routing. Otherwise recommend the decomposition in the same report; the user need not re-ask merely because the work has multiple parts. Do not begin execution.
+- **Mixed decision state.** Some choices are open while other parts are fully specified.
+- **Blocked sub-item.** A mechanical-looking part depends on an unresolved decision, as shown by the repo or docs.
+- **Different reviewer.** Parts need different expertise or approvals.
+- **Different definition of done.** Parts need different verification or acceptance evidence.
 
-Completion criterion: the task qualifies for a routine exit, requires a justified split, or can proceed to discovery. State consequential uncertainties rather than assuming a single route.
+These are signals, not a vote or a threshold: different reviewers or verification methods can belong to one coherent deliverable. Split only when keeping the parts together would cause incompatible assumptions, premature work on a blocked part, or independent deliverables forced through one workflow. Parts that serve one outcome are phased work: continue to discovery and route them as an ordered or per-workspace chain in Step 4.
 
-## Step 1 — Discover the installed routes
+Report the parts, their dependencies, and the capability each needs. Name capabilities, not skills. Check for a blocked part in the named workspace only; don't run skill discovery or search the wider filesystem for a split. Recommend an order in the same report, so the user doesn't have to re-ask just because the work has several parts; ask them to pick only when an unresolved priority decision blocks routing. Route nothing and stop.
 
-Build a task-relevant candidate inventory within an explicit search scope. No library, publisher, namespace, or fixed skill name has preferential eligibility.
+Completion criterion: the task takes an exit, or proceeds to Step 1 with its consequential uncertainties stated.
 
-1. Discover task skills independently of any application. Live skill lists, configuration, manifests, environment variables, and installation records provide useful starting points, but do not define eligibility; use Step 1's bounded expansion rules to set search scope. A standalone skill outside an application's directories is an equal candidate.
-2. Start with the live registry, user-provided paths, and known skill roots identified by local configuration or installation records. Search these roots with `rg --files --hidden --no-ignore -g SKILL.md` where appropriate; inspect alternate definition formats when a manifest identifies them. Expand to additional readable locations when the initial inventory lacks a compatible candidate, a source points to another location, a specific unresolved capability or compatibility fact could change the recommendation, or the user requests exhaustive discovery. Choose and report the next bounded scope before searching it. Whole-filesystem traversal is reserved for explicitly requested exhaustive discovery; exclude virtual kernel/process filesystems and remote mounts, respect permissions, and use cycle protection when following directory symlinks. Caches, vendor trees, and unfamiliar application directories are eligible when relevant, but need not be scanned indiscriminately.
-3. Inspect frontmatter names and descriptions for capabilities relevant to the task, including requirements, planning, implementation, testing, debugging, review, design, research, and specialist domain work. Do not filter solely by directory name or a familiar task keyword: a differently named skill may be the best fit. Distinguish execution skills from routers and adjacent capabilities.
-4. Shortlist a few plausible contenders from descriptions by task coverage and known compatibility. Read their full bodies, expanding the shortlist only when a contender fails or a specific unresolved capability or compatibility fact could change the recommendation. Read references that could change compatibility or ranking; before claiming a selected route is verified, inspect all mandatory references applicable to that route. Record each inspected contender's canonical path, declared name, runtime/namespace if any, supported targets, task coverage and output artifacts, prerequisites, isolation/delegation model, effort controls, invocation restrictions, and side effects such as posting PR comments or editing files. Bound total inspection effort, including reference depth, by whether more reading could materially change the recommendation. If that effort would exceed its value, stop and report a conditional recommendation with uninspected requirements and comparison limits explicit.
-5. Deduplicate symlink aliases by resolved path. Keep distinct versions or implementations separate. Keep discovery separate from invocation: a standalone skill can be usable by reading its instructions even without registration in the current application. Verify required tools and execution compatibility. For cached, archived, or application-bound copies, report whether their instructions can be used directly or require activation in a particular runtime. Never claim a filesystem match establishes an available slash command, and never discard a compatible skill solely because no application registered it.
+## Step 1 — Discover candidates
 
-Use a compact inventory:
+Start from what is already known and widen only to fill a gap. A **phase** is a distinct capability the task needs, such as diagnosis, testing, review, or a requirements interview.
 
-| Candidate and source path | Capabilities | Targets and prerequisites | Invocation and availability |
-|---|---|---|---|
-| Actual installed name | What its body says it does | Supported tasks, required docs/tools | Verified command or skill path; active, inactive, or uncertain |
+1. **Registry first, plus one frontmatter scan.** Begin with the live skill list in context and any paths the user gave. The registry omits user-only skills (`disable-model-invocation: true`) and unregistered ones, so always list the names and descriptions in the configured skill roots too — frontmatter only, not bodies (for example `rg -l -g SKILL.md "disable-model-invocation: true" <root>` alongside the root listing). If the two together hold a plausible candidate for every phase, go to item 3. Never discard a compatible skill because no application registered it.
+2. **Widen on a gap.** Search the filesystem only when the registry lacks a compatible candidate, a source points to another location, an unresolved fact could change the winner, or the user asks for exhaustive discovery. Search skill roots named in local configuration or install records first: `rg --files --hidden --no-ignore -g SKILL.md <root>`, or `find <root> -name SKILL.md` without `rg`. Also check plugin command files (`commands/*.md`) and any other definition format a manifest names, and the harness's built-in commands. Name each wider scope before searching it. Search the whole filesystem only on explicit request; skip `/proc`, `/sys`, and remote mounts, respect permissions, and guard against symlink cycles.
+3. **Screen** names and descriptions for the capabilities the task needs. Don't filter on directory name or a familiar keyword. Mark routers separately from execution skills.
+4. **Shortlist two or three finalists per phase and read their full bodies.** A single-phase task gets two or three in total. Skills the user named form the shortlist for their phase; if one of them later fails a Step 2 gate, return here and add a replacement. A skill that covers several phases counts once and is compared in each. Read a reference only when it could change compatibility or ranking, but before calling a selected route verified, read every reference its body makes mandatory. Stop reading once more reading could not change the recommendation, and list what stayed uninspected.
+5. **Read the frontmatter** of each finalist for invocation restrictions (`disable-model-invocation`, `user-invocable`, allowed tools) and runtime or effort controls. These set the `[user]`/`[agent]` markers in Step 5; never guess them. Verify built-in command syntax and effort levels against the local harness.
+6. **Resolve identity.** Deduplicate symlinks by resolved path; keep distinct versions separate. A file on disk is not a slash command: an unregistered standalone skill is usable by its path. For a cached, archived, or app-bound copy, report whether its instructions can be used directly or need activation in a particular runtime. Check name collisions against the registry (a custom `code-review` can shadow a built-in harness command) and resolve the actual target.
 
-Check name collisions against the live registry and runtime precedence. For example, a custom `code-review` skill can shadow a built-in command. Resolve the actual target before recommending an invocation; use a qualified name or explicit path when supported. Verify built-in command syntax and effort levels against the local harness rather than retaining version-specific assumptions here.
+Never invent or install a skill. If a location was unreadable or discovery stopped early, say so.
 
-If a directory is unreadable or discovery is incomplete, state the coverage limit. If no suitable local skill is found, say so; do not invent one or install anything.
+Record finalists in one table:
 
-Completion criterion: every shortlisted candidate has a source path or live registry entry, and the searched scope and meaningful coverage limits are recorded. Stop when the scoped inventory supports comparison of suitable candidates with no known relevant gap, or when further discovery would exceed proportional effort for the task. If no candidate is suitable within that scope, report that finding and the remaining uncertainty; do not imply exhaustive absence.
+| Candidate | Source path | Does and produces | Requires and side effects | Invocation restrictions | Invocation and status |
+|---|---|---|---|---|---|
+| Installed name | Resolved path | Capabilities and artifacts from its body | Files, tools, services, live user; edits files, posts comments | From frontmatter: user-only, agent-invocable, tool limits | Verified command or path; active, inactive, or uncertain |
+
+Completion criterion: every finalist has a source path or registry entry, and the searched scope and its limits are recorded. If nothing suitable exists in scope, report that without implying exhaustive absence.
 
 ## Step 2 — Run the four probes
 
-Evaluate discovered candidates by their installed instructions. These probes select capabilities, not collections.
+Evaluate the finalists' recorded facts against this task and environment.
 
-### Probe A — Prerequisites and artifacts
+**A — Prerequisites and artifacts.** Separate mandatory prerequisites from examples and fallbacks. A clearable state (missing config, uncommitted work) becomes a proposed prerequisite step — don't perform it. A standing constraint (no interactive user, unavailable tool, incompatible target) gates the route. A missing requirement can remove one dimension of a skill or make the whole skill unusable; state which. Match the produced artifact to the user's intent and its expected lifetime. Mark uninspected requirements as unknown. Never infer prerequisites or superiority from skill length, publisher, or a remembered comparison.
 
-Apply Step 1's staged inspection to shortlisted contenders. Check their actual required files, tools, repository conventions, services, live-user interaction, and permissions from inspected sources; mark uninspected requirements as unknown. Record the artifacts it produces: executable plans, backlog tickets, specs, code, reports, or published changes. Match the artifact to the user's intent and expected lifetime.
+**B — Drift and shortcuts.** For long, unattended, unfamiliar, or consequential work, prefer verified checkpoints, real verification, independent review, or recovery limits. For short supervised work, skip artifacts and handoffs that prevent no concrete failure.
 
-Distinguish mandatory prerequisites from examples and documented fallbacks. Pass explicit documentation paths where supported. A missing requirement can remove a dimension or make the whole skill unusable; state which. Do not infer prerequisites or automatic superiority from skill length, publisher, or a remembered comparison.
+**C — Domain coverage.** Check whether the task needs specialist coverage: security, performance, accessibility, native UI, observability, CI/CD, release, migrations, architecture, research, or visual design. Prefer direct domain fit over adapting a general skill. Claim unique coverage only after comparing the relevant bodies.
 
-A clearable state becomes a proposed prerequisite step rather than an automatic loss. Do not perform that step here. Standing constraints such as no interactive user, unavailable tools, or an incompatible target genuinely gate a route.
+**D — Workspace, runtime, feedback loop.** Resolve each target workspace independently; mixed decision states go back to Step 0's split test. When the route depends on verification, inspect the actual tests and commands — headless tests, infrastructure-dependent tests, device checks, and manual visual checks are different loops. Don't add a test suite just to satisfy a candidate; if establishing tests is part of the user's request, report it as a prerequisite step. A candidate's required unavailable runtime rules it out; a portable subset can fit if you name the adaptation. A compiling build is not verification.
 
-### Probe B — Risk of drift or shortcuts
+Completion criterion: each probe has local evidence or an explicit unknown or not-applicable finding. If a missing fact could change the winner, give a conditional route and name the fact.
 
-For long, unattended, unfamiliar, or consequential work, prefer candidates with verified checkpoints, meaningful verification, independent review, or recovery limits. Compare the discipline offered against its cost. Do not assume only one library provides these controls. For short supervised work, avoid imposing artifacts and handoffs that do not prevent a concrete failure.
-
-### Probe C — Domain coverage
-
-Check whether the task needs specialist coverage such as security, performance, accessibility, native UI, observability, CI/CD, release, migrations, architecture, research, or visual design. Screen discovered candidates by description, including standalone and unfamiliar skills, and inspect plausible specialist contenders under Step 1's effort bound. Claims of unique coverage require inspected evidence; otherwise state the comparison limit. Prefer direct domain fit over adapting a familiar skill with mismatched assumptions.
-
-### Probe D — Workspace, runtime, and feedback loop
-
-Resolve the target workspace and runtime. For multi-workspace work, check each workspace independently; use a shared design/planning front half only where the intent and artifacts are shared. Different implementation loops can require different routes. Mixed decision states go back to Step 0's split test.
-
-When the recommendation depends on a workspace's verification loop, inspect actual test files and runnable verification commands. Headless tests, infrastructure-dependent tests, device checks, and manual visual checks are different feedback loops. If the workspace lacks tests, do not add a test-suite project merely to satisfy a candidate; select a compatible workflow or clearly report a prerequisite if establishing tests is part of the user's request.
-
-Read platform assumptions from the candidate body: browser APIs, native tools, language, framework, service connectors, and deployment model. A portable subset may fit if you name the adaptation; a required unavailable runtime rules it out. Do not label work verified merely because a build compiles.
-
-Completion criterion: each applicable probe has local evidence or an explicit unknown/not-applicable finding. Name known target workspaces and check contenders' required files/tools and feedback loops where accessible. If a missing workspace or fact could change the winner, give a conditional route and identify the minimum information needed; do not invent evidence or require unrelated checks.
-
-## Step 3 — Rank by task fit
-
-Build a task-specific comparison from the discovered inventory instead of a permanent winner table.
-
-| Candidate and source | Task coverage and output | Prerequisites and compatibility | Advantage and cost |
-|---|---|---|---|
-| Actual discovered name/path | Verified capabilities and artifacts | Probe A/D evidence | What it improves and what it adds |
-
-Match requirements interviews to real unresolved decisions; research skills to lookup-able facts; executable planning to imminent implementation; durable tickets/specs to backlog work; debugging to reproduction and diagnosis; testing to the actual feedback loop; and specialist skills to their domain. These are capability categories, not fixed skill names.
-
-Rank by coverage of the user's intended outcome, prerequisite compatibility, runtime fit, verification strength, and proportional effort. A candidate outside a familiar library can win every category. Do not claim a feature is unique without comparing relevant discovered bodies. Verify handoff rules: a skill that mandates implementation may be a poor fit when the user only wants tickets for later.
-
-For a review-only ask, compare review routers and direct reviewers by the same criteria as other candidates. A router such as `which-codereview` receives no preference from its name. Recommend an additional router only when its narrower selection capability prevents a named failure that direct comparison does not. Track router paths already visited or proposed in this routing session; exclude any route that returns to this skill or repeats a router. For a review link in a broader chain, use verified reviewer capabilities and appropriate effort instead of assuming a built-in command or a publisher-specific reviewer.
-
-Completion criterion: each recommended candidate and any reported strongest relevant alternative have inspected source bodies; exclusions and tradeoffs trace to those bodies or observed environment constraints. If no suitable alternative or winner was found, say so within the searched scope. When evidence is incomplete, distinguish a conditional recommendation from a verified fit.
-
-## Step 4 — Chain, when phases need different capabilities
-
-Mix when phases need different capabilities or complementary controls that prevent concrete failures. Report the chain as an ordered list with the invocation syntax, and say why each link is there.
-
-### Size the chain before you build it
-
-A chain is not free. Every link is a handoff, a context switch, and a chance for the thread to drop — so even a short task needs a concrete reason for each added link. **The default is one link. Each additional link has to be argued for, and the argument is a named failure.**
+## Step 3 — Rank
 
 Apply in order:
 
-1. **Name the failure.** For each link, write the specific thing that goes wrong if it isn't there — not "less rigor," an actual outcome ("ships an untested gate", "picks the seam by accident"). **A link with no nameable failure comes out.**
-2. **Check contributions are distinct.** Remove links that duplicate an existing safeguard. Links may address the same failure when they catch different causes or supply complementary evidence, such as implementation tests and independent security review. State what each adds. An interview and planning step are redundant only when they resolve the same decisions without adding useful evidence or a required artifact. Preserve mandatory handoffs; if a chain cannot satisfy them, choose another compatible route.
-3. **Size controls to actual risk and uncertainty.** Assess the consequences of this change, unresolved decisions, and missing safeguards. Use expected diff size as one effort signal; a consequential one-line change may need substantial verification. A broad topic alone does not justify extra links.
-4. **Drop the interrogation link when the unknowns are lookup-able.** Look up facts and reserve user questions for decisions. If you can answer the open questions by reading the repo, read the repo and skip the link.
+1. **Gate** on prerequisite and runtime compatibility (Probes A and D).
+2. **Coverage** of the user's intended outcome, including domain fit (Probe C).
+3. **Verification strength** proportional to the task's risk (Probe B).
+4. **Effort.** Fewer links and lighter artifacts win ties. If still tied, recommend one and name the other as the alternative.
 
-Rough calibration, to be overridden by the failure test rather than followed mechanically:
+Match capability to need: interviews to real unresolved decisions; research to lookup-able facts; executable plans to imminent implementation; tickets or specs to backlog work; debugging to reproduction and diagnosis; testing to the actual feedback loop. Check handoff rules — a skill that mandates implementation fits poorly when the user wants tickets for later.
+
+Routers are ordinary candidates. Recommend one only when its narrower selection prevents a named failure that direct comparison does not. Track every router visited or proposed in this routing session, and never route back to this skill or repeat one of them. If the answer to the user's question is this skill itself (for example, "which skill picks skills?"), say so and ask for the concrete task in the same report; don't list this skill as an invocation.
+
+Reviews: if this skill is triggered for a review-only ask, compare `which-codereview`, `which-security-review`, and direct reviewers as ordinary candidates. For a review link inside a broader chain, choose from verified reviewer capabilities at an effort sized to risk; don't assume a built-in command or a particular publisher's reviewer.
+
+Completion criterion: each recommended candidate and the named alternative have inspected bodies, and every exclusion traces to a body or an observed constraint. Mark a conditional recommendation as conditional.
+
+## Step 4 — Chain only when phases need different capabilities
+
+The default is one link. Each extra link must name the failure it prevents.
+
+1. **Name the failure.** Write the concrete outcome that happens without the link ("ships an untested gate", "picks the seam by accident"), not "less rigor". No nameable failure, no link.
+2. **Keep contributions distinct.** Drop a link that duplicates another's safeguard. Two links may target the same failure only through different mechanisms, such as implementation tests and an independent security review. Preserve mandatory handoffs; if the chain can't satisfy them, pick another route.
+3. **Size to risk, not topic.** A consequential one-line change may need substantial verification; a broad topic alone justifies nothing.
+4. **Look up facts instead of asking.** If the repo answers the open questions, drop the interview link.
+
+Calibration — the failure test overrides it:
 
 | Work size | Expected links |
 |---|---|
-| One sitting, one workspace | **1** — usually just an implementation skill |
-| One sitting, but a real design choice inside it | **2** — the design link plus implementation |
-| Multi-session, or spanning workspaces with different loops | **3–4**, and Probe D usually splits the back half |
-| Genuine epic, backlog-bound | interrogation → tickets, then re-route per ticket later — do not plan the whole thing now |
+| One sitting, one workspace | **1** — usually an implementation skill |
+| One sitting with a real design choice | **2** — design, then implementation |
+| Multi-session, or workspaces with different loops | **3–4**; Probe D usually splits the back half |
+| Backlog-bound epic | interview → tickets; route each ticket later |
 
-**If links add more cost than protection, remove redundant links or choose a simpler compatible route.** Preserve safeguards justified by actual consequences and mandatory handoffs. Recommending ceremony is the same failure Step 0 exists to prevent, arriving one step later.
+Before pairing links, check each body's terminal state and handoffs. Avoid duplicate planning, contradictory test loops, and repeated general reviews. Keep reviewer outputs separate when their instructions require it. Recommending ceremony is the same failure Step 0 exists to prevent, one step later.
 
-Completion criterion: every link has a named failure and a distinct contribution attached. Links addressing the same failure explain their complementary mechanisms or evidence, and the chain satisfies mandatory handoffs.
-
-Choose each chain link from the live inventory. Examples of capability sequences are diagnosis → regression test/fix → verification, requirements decisions → backlog tickets, or boundary design → public interface contract. These are examples, not required pipelines or named-library routes.
-
-Avoid duplicate planning, contradictory test loops, and repeated general reviews. Check mandatory handoffs and terminal states from the chosen bodies before pairing them. Keep reviewer outputs separate when their instructions require it. Do not route to candidates whose required prerequisites failed Probe A or whose runtime failed Probe D.
+Completion criterion: every link has a named failure and a distinct contribution, and the chain satisfies mandatory handoffs.
 
 ## Step 5 — Report
 
-Output, in this order:
+Output in this order:
 
 1. **Verdict** — one skill, a minimal chain, a per-workspace chain, "split first", "no suitable local route found", or "none — just do it".
-2. **Why** — at most two sentences naming the decisive probes and coverage limitations.
-3. **What you're giving up** — strongest relevant alternative and its verified advantage; say if no suitable alternative was found.
-4. **Invocation** — verified commands or supported instruction-file invocations, in order, with prerequisites and the specific failure each chain link prevents. Mark `[user]` for user-only commands or required human action and `[agent]` for compatible agent invocation once authorized. Check installed frontmatter and runtime restrictions; do not invent slash commands. A standalone compatible skill can be used through its explicit file path without app registration. State uncertain syntax or missing activation instead of presenting it as callable.
-5. **Discovery** — selected source paths, serious alternatives, declared search scope, and relevant locations within that scope that were unreadable or deliberately left unsearched. Distinguish registered commands, standalone usable instructions, and incompatible or inactive copies.
+2. **Why** — at most two sentences naming the decisive probes and coverage limits.
+3. **What you're giving up** — the strongest alternative and its verified advantage, or "no suitable alternative found".
+4. **Invocation** — verified commands or instruction-file paths, in order, with prerequisites and each link's named failure. Mark `[user]` for user-only commands or human action and `[agent]` for agent-invocable steps once authorized, based on the frontmatter read in Step 1. State uncertain syntax or missing activation; never invent a slash command.
+5. **Discovery** — selected paths, serious alternatives, searched scope, and unreadable or unsearched locations within it.
 
-For "no suitable local route found", report the missing capability or prerequisite, searched scope, and remaining uncertainty; omit invocation strings. For "none — just do it", report the verdict only. For "split first", report the parts, dependencies, likely capability for each, and any decision needed to route them; omit invocation strings because no route was chosen.
+For "none — just do it", report the verdict only. For "split first", report parts, dependencies, likely capabilities, a recommended order, and any blocking decision — no invocations. For "no suitable local route found", report the missing capability, searched scope, and remaining uncertainty — no invocations.
+
+Example (illustrative names):
+
+> **Verdict:** chain — `repro-debug` → `test-first`
+>
+> **Why:** The failure isn't reproduced yet (Probe B), and `api/` has a headless vitest suite that `test-first`'s loop needs (Probe D).
+>
+> **What you're giving up:** `fix-and-verify` does both phases in one skill, but its body has no reproduction step before the fix.
+>
+> **Invocation:**
+> 1. `[user]` Prerequisite: share the failing request's logs from staging.
+> 2. `[agent]` `/repro-debug` — prevents fixing a guessed cause.
+> 3. `[agent]` `/test-first` — prevents the fix landing without a regression test.
+>
+> **Discovery:** live registry plus `~/.claude/skills`; `repro-debug` at `~/.claude/skills/repro-debug/SKILL.md`. `~/.cache` not searched.
 
 **Do not invoke. Do not begin the work. Stop after the report.**

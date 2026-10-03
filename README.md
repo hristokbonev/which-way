@@ -7,7 +7,7 @@ Three agent skills for choosing the next workflow or reviewer:
 - **which-security-review** recommends whether and how to assess a security concern.
 
 Each skill reports a route and stops. Installing these skills does not run any
-review or workflow. The library preserves the three supplied skill files as-is.
+review or workflow.
 
 ## Install skills
 
