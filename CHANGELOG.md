@@ -25,8 +25,12 @@
 - Routes rank dedicated security reviewers before general reviewers and
   guidance skills; built-in registry commands count as installed. Unattended
   agent work needs positive evidence and is isolated with a fresh session.
-- Report gained Target (with SHAs) and Focus sections; credential-like values
-  get a separate `[user]` rotation step and are never quoted.
+- Report gained Target (with SHAs), Focus, and Response steps sections;
+  credential-like values get a separate `[user]` rotation step and are never
+  quoted, and text addressing reviewers is cited by location as suspected
+  injection rather than copied into the reviewer's brief.
+- A repository audit treats the repository's own skills, hooks, `CLAUDE.md`
+  and scanner configs as target-supplied, so it cannot pick its own reviewer.
 
 ## 0.2.1 — 2026-10-04
 
