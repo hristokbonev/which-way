@@ -86,7 +86,7 @@ Match capability to need: interviews to real unresolved decisions; research to l
 
 Routers are ordinary candidates. Recommend one only when its narrower selection prevents a named failure that direct comparison does not. Track every router visited or proposed in this routing session, and never route back to this skill or repeat one of them.
 
-Reviews: if this skill is triggered for a review-only ask, compare `which-codereview`, `which-security-review`, and direct reviewers as ordinary candidates. For a review link inside a broader chain, choose from verified reviewer capabilities at an effort sized to risk; don't assume a built-in command or a particular publisher's reviewer.
+Reviews: for a review link inside a chain, choose from verified reviewer capabilities at an effort sized to risk; don't assume a built-in command or a particular publisher's reviewer.
 
 Completion criterion: each recommended candidate and the named alternative have inspected bodies, and every exclusion traces to a body or an observed constraint. Mark a conditional recommendation as conditional.
 
@@ -94,10 +94,9 @@ Completion criterion: each recommended candidate and the named alternative have 
 
 The default is one link. Each extra link must name the failure it prevents.
 
-1. **Name the failure.** Write the concrete outcome that happens without the link ("ships an untested gate", "picks the seam by accident"), not "less rigor". No nameable failure, no link.
+1. **Name the failure.** Write the concrete outcome that happens without the link ("ships an untested gate", "picks the seam by accident"), not "less rigor". No nameable failure, no link; a broad topic alone justifies none.
 2. **Keep contributions distinct.** Drop a link that duplicates another's safeguard — duplicate planning, repeated general reviews. Two links may target the same failure only through different mechanisms, such as implementation tests and an independent security review. Check each body's terminal state and handoffs before pairing: avoid contradictory test loops, keep reviewer outputs separate when their instructions require it, and preserve mandatory handoffs; if the chain can't satisfy them, pick another route.
-3. **Size to risk, not topic.** A consequential one-line change may need substantial verification; a broad topic alone justifies nothing.
-4. **Look up facts instead of asking.** If the repo answers the open questions, drop the interview link.
+3. **Look up facts instead of asking.** If the repo answers the open questions, drop the interview link.
 
 Calibration — the failure test overrides it:
 
