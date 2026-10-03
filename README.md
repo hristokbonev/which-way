@@ -9,13 +9,9 @@ Three agent skills for choosing the next workflow or reviewer:
 Each skill reports a route and stops. Installing these skills does not run any
 review or workflow. The library preserves the three supplied skill files as-is.
 
-Requires Node.js 22 or newer. The package is prepared for npm, but it has not
-been published to the registry yet. Until publication, use the local package
-commands below.
+Requires Node.js 22 or newer.
 
 ## Install skills
-
-Once the package is published:
 
 ```sh
 npx which-way list
