@@ -26,7 +26,7 @@ test('list and informational commands report bundled skills without writes', asy
   for (const name of ['which-codereview', 'which-framework', 'which-security-review']) {
     assert.match(listed.stdout, new RegExp(name));
   }
-  assert.equal((await invoke(['--version'])).stdout, '0.1.0\n');
+  assert.equal((await invoke(['--version'])).stdout, '0.2.0\n');
   assert.match((await invoke(['--help'])).stdout, /install/);
   assert.match((await invoke([])).stdout, /Usage:/);
   await assert.rejects(lstat(listed.cwd), /ENOENT/);
