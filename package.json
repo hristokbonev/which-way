@@ -1,0 +1,22 @@
+{
+  "name": "which-way",
+  "version": "0.1.0",
+  "description": "A library of agent skills for choosing workflows and reviews",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "which-way": "bin/which-way.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "skills/",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  }
+}
