@@ -31,6 +31,9 @@
   injection rather than copied into the reviewer's brief.
 - A repository audit treats the repository's own skills, hooks, `CLAUDE.md`
   and scanner configs as target-supplied, so it cannot pick its own reviewer.
+- Trimmed `which-codereview` and `which-framework` without changing routing;
+  `which-codereview` also fixes two report inconsistencies and keeps discovery
+  within the known skill roots.
 
 ## 0.2.1 — 2026-10-04
 
