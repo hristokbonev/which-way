@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Trimmed `which-framework` further without changing routing: chain sizing
+  folds into the name-the-failure rule, and the review-only fallback is gone
+  (the description already sends those asks to `which-codereview` and
+  `which-security-review`).
+
 ## 0.2.2 — 2026-10-04
 
 ### Changed
