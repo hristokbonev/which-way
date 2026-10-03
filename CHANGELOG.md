@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.1 — 2026-10-04
+
+### Changed
+
+- `which-codereview` treats diff content, commit messages and PR descriptions
+  as data, and a diff can no longer configure its own review: modified
+  convention docs, hooks, settings and agent definitions are not used as the
+  review standard, and checks whose CI or tests the diff changed do not count
+  toward a skip.
+- `which-codereview` counts work as unattended agent work only on positive
+  evidence, defaults to the working tree when no target is named, measures PRs
+  between their base and head commits, and lists reviewers that need a
+  clearable prerequisite as conditional alternatives instead of asking.
+- Simplified `which-codereview` effort rules (at most one reduction, no fixup
+  or mechanical-pattern reductions) and added Target and Focus sections to its
+  report.
+
 ## 0.2.0 — 2026-10-04
 
 ### Changed
