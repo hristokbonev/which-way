@@ -9,39 +9,66 @@ Three agent skills for choosing the next workflow or reviewer:
 Each skill reports a route and stops. Installing these skills does not run any
 review or workflow. The library preserves the three supplied skill files as-is.
 
-Requires Node.js 22 or newer.
-
 ## Install skills
 
 ```sh
-npx @hristobonev/which-way list
-npx @hristobonev/which-way install
-npx @hristobonev/which-way install which-framework --claude
-npx @hristobonev/which-way install --global
-npx @hristobonev/which-way install --dir ./custom-skills
+npx skills@latest add hristokbonev/which-way
 ```
 
-`npx` downloads the npm package and runs its executable. `npm install
-@hristobonev/which-way` adds the package to a JavaScript project, but does not copy skills
-into an agent's discovery directory; run `which-way install` to do that.
+The [skills CLI](https://github.com/vercel-labs/skills) installs directly from
+this repository and handles agent selection, destination paths, and installation
+scope. It can detect installed agents; use the flags below to choose explicitly.
 
-By default, installation copies all three skills into the current project's
-`.agents/skills` directory. Pass a skill name to install just one. `--claude`
-uses `.claude/skills`; `--global` uses the same location under your home
-directory. These two flags can be combined. `--dir <path>` uses a custom skill
-root; a relative path is resolved from the current directory and cannot be
-combined with `--claude` or `--global`.
+### Choose apps and skills
 
-Existing skill directories cause the whole installation to stop before any
-copying. `--force` replaces only selected skill directories, preserving other
-skills. The installer rejects symbolic links at the skill root and selected
-skill directories. No install command prompts or uses the network.
+Repeat `--agent` to select several apps and `--skill` to select several skills:
+
+```sh
+npx skills@latest add hristokbonev/which-way \
+  --agent codex --agent claude-code \
+  --skill which-framework --skill which-codereview
+```
+
+| App | Agent ID |
+| --- | --- |
+| Codex | `codex` |
+| Claude Code | `claude-code` |
+| Cursor | `cursor` |
+| Gemini CLI | `gemini-cli` |
+| GitHub Copilot | `github-copilot` |
+| Windsurf | `windsurf` |
+| Google Antigravity | `antigravity` |
+| OpenCode | `opencode` |
+| Cline | `cline` |
+| Roo Code | `roo` |
+
+See the upstream [supported agents](https://github.com/vercel-labs/skills#supported-agents)
+for the full list. List this library's skills without installing:
+
+```sh
+npx skills@latest add hristokbonev/which-way --list
+```
+
+### Choose scope
+
+Installation defaults to the current project. Add `--global` to install for
+your user account across projects:
+
+```sh
+npx skills@latest add hristokbonev/which-way \
+  --agent codex --skill which-framework --global
+```
+
+The CLI offers symlink or copy installation. Add `--copy` for independent
+copies and `--yes` to skip confirmation prompts when scripting an explicit
+selection.
 
 ## Work from this repository
 
+Local development requires Node.js 22 or newer.
+
 ```sh
-node bin/which-way.js list
-node bin/which-way.js install --dir ./example-skills
+npx skills@latest add . --list
 npm test
 npm pack --dry-run
 ```
