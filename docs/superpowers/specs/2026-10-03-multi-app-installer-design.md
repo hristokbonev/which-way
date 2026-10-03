@@ -1,113 +1,85 @@
-# Multi-app skill installer
+# Guided multi-app skill installation with `skills@latest`
 
-## Goal
+## Goal and package identity
 
-Let people install any combination of the three bundled skills for one or more
-AI coding apps at either project or user scope. Running the npm executable
-without arguments opens a guided terminal picker. Existing scripted commands
-remain usable.
+People can choose several AI coding apps, any subset of the three bundled
+skills, and project or user scope in one guided run. The guided entry point is
+`npx @hristokbonev/which-way` with no arguments. The package's correct npm
+name is `@hristokbonev/which-way`; the GitHub repository remains
+`hristokbonev/which-way`. The already published
+`@hristobonev/which-way@0.1.0` is a different npm package and is not the
+target of this release.
 
-The user chose a curated set of ten apps, app-specific discovery directories,
-multi-app selection, one common skill selection, and one common scope per run.
-The first release remains a local `SKILL.md` copier; it does not configure an
-app, run a selected skill, or download other skills.
+Use the upstream [`skills` CLI](https://github.com/vercel-labs/skills) for
+discovery and installation rather than maintaining destination mappings and
+copy logic for each app. Its published agent catalog, installation methods,
+and destination choices are the source of truth for this flow. The upstream
+CLI was checked in read-only `--list` mode against both this checkout and
+`hristokbonev/which-way`; both yielded exactly the three intended skills.
 
-## Destination catalog
+## Guided flow
 
-The app IDs used by `--app` and the picker are `codex`, `claude`, `cursor`,
-`gemini`, `copilot`, `windsurf`, `antigravity`, `opencode`, `cline`, and `roo`.
-Each project's base is the invoking current directory; each user's base is
-the home directory returned by the OS. Append the path below to that base.
-Use app-specific paths where documented. The Codex and Antigravity project
-paths deliberately coincide; deduplicate their resolved absolute roots.
+When stdin and stdout are terminals, `which-way` with no arguments presents a
+line-oriented picker. It first lets the user choose one or more apps from
+Codex, Claude Code, Cursor, Gemini CLI, GitHub Copilot, Windsurf, Google
+Antigravity, OpenCode, Cline, and Roo Code. Show the corresponding upstream
+agent IDs: `codex`, `claude-code`, `cursor`, `gemini-cli`,
+`github-copilot`, `windsurf`, `antigravity`, `opencode`, `cline`, and `roo`.
+Users can enter multiple menu numbers or `all`. Do not silently narrow the
+choice to installed or detected apps.
 
-| App | Project skill root | User skill root | Documentation |
-| --- | --- | --- | --- |
-| Codex | `.agents/skills` | `.agents/skills` | https://learn.chatgpt.com/docs/build-skills |
-| Claude Code | `.claude/skills` | `.claude/skills` | https://code.claude.com/docs/en/skills |
-| Cursor | `.cursor/skills` | `.cursor/skills` | https://prod.cursor.com/docs/skills |
-| Gemini CLI | `.gemini/skills` | `.gemini/skills` | https://geminicli.com/docs/cli/creating-skills/ |
-| GitHub Copilot | `.github/skills` | `.copilot/skills` | https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills |
-| Windsurf / Devin Cascade | `.devin/skills` | `.codeium/windsurf/skills` | https://docs.devin.ai/desktop/cascade/skills |
-| Google Antigravity | `.agents/skills` | `.gemini/config/skills` | https://antigravity.google/docs/skills |
-| OpenCode | `.opencode/skills` | `.config/opencode/skills` | https://opencode.ai/docs/skills |
-| Cline | `.cline/skills` | `.cline/skills` | https://docs.cline.bot/customization/skills |
-| Roo Code | `.roo/skills` | `.roo/skills` | https://roocodeinc.github.io/Roo-Code/features/skills/ |
+The picker then presents the three bundled skill names and descriptions and
+accepts one or more numbers or `all`. It asks for one scope, `project` or
+`user`, shared by all selected apps. It shows the selected apps, skills,
+scope, and source package before a final confirmation that defaults to no.
+Cancellation or end-of-input exits without installing. Invalid or empty
+selections are re-prompted. With no arguments and no terminal, print
+actionable usage and exit nonzero without installing.
 
-A custom directory choice remains available for apps outside the catalog.
-It is an explicit skill-root path, resolved from the current directory when
-relative, and is not transformed by project/user scope.
+After confirmation, spawn `npx --yes skills@latest add <bundled-package-root>`
+in the invoking project directory with one `--agent` per app, one `--skill`
+per skill, `--global` for user scope, `--copy`, and `--yes`. Pass an absolute
+path to the packaged root so installation uses the same skill bytes as the
+npm package version the user launched. Use argument arrays, not a shell
+command string. Propagate upstream output and exit status. The upstream
+command may need network access to fetch `skills@latest`; show a useful
+error if it cannot start. `--copy` retains the existing package's independent
+copy behavior. The wrapper does not itself write app skill directories.
 
-## Guided terminal flow
+## Scripted and existing commands
 
-`which-way` with no arguments opens a built-in, dependency-free line-oriented
-picker only when stdin and stdout are terminals. It shows the app names and
-accepts one or more menu numbers separated by commas or `all` for the ten
-named apps; it also offers a custom directory option. Duplicate selections
-are collapsed. A custom directory can
-be combined with named apps and prompts for a path.
+`which-way install --app <id> [--app <id> ...] [--skill <name> ...]
+[--scope project|user]` uses the same upstream path without prompts. If no
+`--skill` is supplied, select all three; if no `--scope` is supplied, use
+project scope. The app and skill flags can be repeated. Reject unknown IDs,
+names, malformed values, and unsupported combinations before invoking
+upstream. An explicit app is required for this new scripted path so there is
+no hidden agent auto-detection.
 
-The picker then lists the three bundled skill names and descriptions and
-accepts one or more numbers or `all`. It asks for `project` or `user` scope
-for named apps, computes unique destination roots, and shows a final summary
-of selected apps, skills, scope, and exact absolute paths. The default answer
-to the final confirmation is no. Cancellation or end-of-input exits without
-writing. Invalid or empty selections are re-prompted with a clear message.
-The picker never asks for an overwrite decision; an existing selected skill
-requires a new run with `--force` in scripted mode or an explicit force choice
-in the picker before the final summary.
+Keep `which-way list`, `--help`, and `--version` read-only. Preserve the
+existing `which-way install`, `install <skill>`, `--claude`, `--global`,
+`--dir`, and `--force` copier behavior for current users when `--app` is
+absent. Do not mix the legacy `--dir`, `--claude`, or `--force` options with
+the upstream `--app` path. For the upstream path, `--global` may alias
+`--scope user`, but conflicting scope choices are errors. The legacy custom
+directory option remains available through `install --dir`; the guided
+multi-app picker only offers named apps because upstream does not expose an
+arbitrary destination flag.
 
-With no arguments and no terminal, the CLI prints actionable usage and exits
-nonzero without writing. `--help` and `--version` remain read-only.
+## Upstream boundary and release
 
-## Scripted command contract
+The upstream CLI owns destination paths, shared-path handling, existing-skill
+behavior, and writes. The wrapper must not promise all-destination preflight
+or rollback, because upstream does not document those guarantees. Its
+behavior may change with `skills@latest`; document this trade-off and keep
+the selected package's skill contents fixed by using the local package root.
+Do not infer app choice from files in the current directory.
 
-`which-way install` keeps its current behavior: all bundled skills into the
-current project's `.agents/skills` directory. `install <skill>` still selects
-one exact bundled name. `--claude` remains an alias for `--app claude`, and
-`--global` remains an alias for `--scope user`.
-
-- Repeat `--app <id>` to select multiple apps. Without `--app`, use the
-  existing generic `.agents/skills` root.
-- Repeat `--skill <name>` to select multiple skills. Without `--skill` or the
-  positional skill, select all three. Reject mixing positional and `--skill`.
-- `--scope project|user` selects one scope for all named apps; default is
-  `project`. Reject conflicting duplicate scopes or contradictory `--global`.
-- `--dir <path>` adds a custom root to named app roots; with no `--app`, it
-  remains the sole root as before. It may be combined with `--scope` when
-  named apps are selected, but that scope affects only named app roots.
-  `--dir` with the legacy `--claude` or `--global` aliases is rejected for
-  compatibility with current validation.
-- `--force` allows replacing selected existing skill directories, subject
-  to the same symlink and regular-file safeguards as today.
-
-Unknown app IDs, skill names, options, extra positionals, empty flag values,
-and unsupported combinations fail before writes. List output should include
-the new app catalog through a separate `apps` command; `list` remains the
-skill list.
-
-## Installation safety
-
-Compute all unique destination roots before mutation. Preflight every
-selected skill at every root, including source availability, existing
-directories, regular files, and symlinks. Any predictable conflict aborts the
-entire selection without copying to an earlier root. Preserve the current
-`--force` behavior: only selected skill directories are replaced and sibling
-skills remain untouched. Normalize absolute roots before symlink checks so a
-trailing slash cannot bypass the check. Unexpected I/O errors may leave a
-partial installation; report the failed path and do not claim rollback.
-
-The wizard and scripted mode call the same destination resolver and installer.
-No code path should infer an app from files in the current directory or change
-an existing app's configuration files.
-
-## Package and verification
-
-Keep the existing three `SKILL.md` files byte-identical to their sources and
-retain the npm package's dependency-free Node.js 22+ runtime. Add tests for
-every app/scope mapping, alias and flag interaction, multi-skill selection,
-deduplicated roots, all-root preflight, TTY prompts, cancellation, invalid
-selections, and non-TTY no-argument behavior. Test the packed npm artifact in
-an isolated project, including its `.bin/which-way` launcher. Update README
-with guided and scripted examples and the catalog; add a `0.2.0` changelog
-entry. Verify the exact package before publishing the new minor release.
+Rename npm metadata and public examples to `@hristokbonev/which-way`.
+Keep the three `SKILL.md` files byte-identical to their sources. Test picker
+validation, cancellation, non-TTY behavior, argument construction and exit
+propagation with a stubbed subprocess; retain tests for the legacy copier.
+Pack the npm artifact and verify its executable and bundled skills from an
+isolated project. Publish the new scope only after verifying its availability
+and authenticated npm access. Leave the old published scope untouched unless
+the user separately asks to deprecate it.
