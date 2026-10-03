@@ -1,10 +1,13 @@
 {
-  "name": "which-way",
+  "name": "@hristobonev/which-way",
   "version": "0.1.0",
   "description": "A library of agent skills for choosing workflows and reviews",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/hristokbonev/which-way.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "type": "module",
   "engines": {

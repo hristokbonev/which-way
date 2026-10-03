@@ -14,15 +14,15 @@ Requires Node.js 22 or newer.
 ## Install skills
 
 ```sh
-npx which-way list
-npx which-way install
-npx which-way install which-framework --claude
-npx which-way install --global
-npx which-way install --dir ./custom-skills
+npx @hristobonev/which-way list
+npx @hristobonev/which-way install
+npx @hristobonev/which-way install which-framework --claude
+npx @hristobonev/which-way install --global
+npx @hristobonev/which-way install --dir ./custom-skills
 ```
 
 `npx` downloads the npm package and runs its executable. `npm install
-which-way` adds the package to a JavaScript project, but does not copy skills
+@hristobonev/which-way` adds the package to a JavaScript project, but does not copy skills
 into an agent's discovery directory; run `which-way install` to do that.
 
 By default, installation copies all three skills into the current project's

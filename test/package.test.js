@@ -18,6 +18,7 @@ test('npm tarball installs and runs without repository files', async () => {
     'pack', '--json', '--pack-destination', root, '--cache', cache,
   ], { cwd: project });
   const [metadata] = JSON.parse(stdout);
+  assert.equal(metadata.name, '@hristobonev/which-way');
   const entries = metadata.files.map((file) => file.path);
   assert.ok(entries.includes('bin/which-way.js'));
   assert.ok(entries.includes('src/cli.js'));
@@ -31,7 +32,7 @@ test('npm tarball installs and runs without repository files', async () => {
     'install', '--prefix', installRoot, tarball, '--ignore-scripts', '--offline',
     '--no-audit', '--no-fund', '--cache', cache,
   ]);
-  const executable = join(installRoot, 'node_modules', 'which-way', 'bin', 'which-way.js');
+  const executable = join(installRoot, 'node_modules', '@hristobonev', 'which-way', 'bin', 'which-way.js');
   const listed = await run(process.execPath, [executable, 'list'], { cwd: root });
   for (const name of names) assert.match(listed.stdout, new RegExp(name));
 
