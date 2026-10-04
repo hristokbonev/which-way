@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- MIT license (`LICENSE`, `"license": "MIT"` in `package.json`).
+
 ### Changed
 
 - Trimmed `which-framework` further without changing routing: chain sizing
