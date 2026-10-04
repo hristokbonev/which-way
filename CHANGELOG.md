@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.4 — 2026-10-04
+
+### Changed
+
+- `which-codereview`, `which-security-review` and `which-framework` find
+  plugins through `~/.claude/plugins/installed_plugins.json`: they read each
+  plugin's `installPath` (`skills/`, `commands/`, `agents/`), skip stale
+  cached versions, and report disabled plugins as inactive. The review
+  routers also shortlist plugin agents and give their agent-type invocation.
+
 ## 0.2.3 — 2026-10-04
 
 ### Added
