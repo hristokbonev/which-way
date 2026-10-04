@@ -17,6 +17,10 @@
   floor applies only with an override, an explicit `max` request beats the
   small-diff cap, and the evidence-gap modifier needs an unknown that could
   change the starting row.
+- `which-security-review` re-routes only when it actually loaded a file from
+  the target (fixing a loop when rerouting from a base worktree), passes
+  uncommitted changes explicitly to base-worktree reviews, and checks the real
+  path of an executable before its one permitted `--help` call.
 
 ## 0.2.2 — 2026-10-04
 
