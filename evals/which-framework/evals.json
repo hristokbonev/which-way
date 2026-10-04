@@ -1,0 +1,114 @@
+{
+  "skill_name": "which-framework",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Which skill should I use to fix the typo 'recieve' in README.md?",
+      "expected_output": "Verdict 'none \u2014 just do it' and nothing else: no inventory table, no invocation, README.md unchanged.",
+      "assertions": [
+        "Verdict is 'none \u2014 just do it'",
+        "Report is the verdict only: no inventory table, no invocation strings, no other sections",
+        "process.md shows no skill discovery commands (no ls/rg/find over skill roots)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Which skill should I use to bump jsonwebtoken from 8.5.1 to 9.0.0 in the auth service? It's a one-line change in package.json.",
+      "expected_output": "Does NOT take the 'none \u2014 just do it' exit despite the one-line diff: names the auth/security consequence of a major auth-library bump. Recommends a route with security or verification coverage; either security-and-hardening or source-driven-development is acceptable (the choice is judgment-dependent and expected to vary). No edit made.",
+      "assertions": [
+        "Verdict is NOT 'none \u2014 just do it'",
+        "Report names the security/auth or breaking-change consequence of a major auth-library bump",
+        "Recommended route includes security or verification coverage (security-and-hardening or source-driven-development both acceptable)",
+        "If security-and-hardening is recommended, the report flags that its mandatory reference security-checklist.md is missing",
+        "Every invocation line, including prerequisite steps, carries a [user] or [agent] marker"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Which workflow for this: rename the `user_id` column to `account_id` in the payments service, and also we haven't decided whether to switch from Stripe to Adyen yet.",
+      "expected_output": "Verdict 'split first'. Two parts: the column rename (capability: schema migration / expand-contract) and the vendor decision (capability: requirements interview or research). States whether the rename depends on the vendor choice. Names capabilities, not skills; no inventory table; no invocations. Recommends an order so the user need not re-ask; no filesystem-wide search.",
+      "assertions": [
+        "Verdict is 'split first'",
+        "Report identifies the column rename and the vendor decision as separate parts",
+        "Report addresses whether the rename depends on the vendor decision",
+        "Report recommends an order or default for the parts instead of asking the user to re-ask",
+        "Report names capabilities, not specific installed skills, and has no invocation strings",
+        "process.md shows no skill discovery and no filesystem-wide search (e.g. no 'find /')"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Which workflow should I use to add a `--json` flag to the CLI: first design the output schema, then implement it with tests?",
+      "expected_output": "Does NOT split: both parts serve one outcome. Verdict is a chain of at most two links (design, then implementation/testing), each with a named failure it prevents.",
+      "assertions": [
+        "Verdict is NOT 'split first'",
+        "Verdict is one skill or a chain of at most two links",
+        "Each chain link states a concrete named failure it prevents",
+        "process.md shows the configured skill roots were scanned for user-only skills (e.g. implement, implement-spec considered or screened by name)"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I have both `tdd` and `test-driven-development` installed. Which should I use to add a rate limiter to the API?",
+      "expected_output": "Shortlist is exactly these two (no third added unless one fails a gate). Reads both bodies. The report mentions that `tdd` requires confirming test seams with the user before writing tests (a live-user prerequisite). The choice is not justified by line count (38 vs 398 lines). Does not start implementing.",
+      "assertions": [
+        "The TDD-phase comparison is between exactly tdd and test-driven-development (no third TDD candidate)",
+        "Report mentions tdd's requirement to confirm test seams with the user",
+        "Choice is not justified by skill length or line count",
+        "Report states both skills' invocation restrictions (or lack of them) from frontmatter",
+        "Report does not start implementing the rate limiter"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Should I use `diagnosing-bugs` or `debugging-and-error-recovery` for a flaky checkout test that only fails in CI?",
+      "expected_output": "Discusses the CI-only feedback loop (Probe D). Cites that `diagnosing-bugs` calls for raising and pinning a reproduction rate for flaky bugs, versus `debugging-and-error-recovery`'s non-reproducible branch (document conditions and monitor). Recommends one. No invocation.",
+      "assertions": [
+        "Report discusses the CI-only feedback loop",
+        "Report cites diagnosing-bugs' reproduction-rate requirement for flaky bugs",
+        "Report contrasts debugging-and-error-recovery's 'document conditions and monitor' fallback",
+        "Report recommends exactly one of the two skills and marks the recommendation conditional on CI access or the missing repo"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Which skill should I use to turn our product requirements interview into backlog tickets?",
+      "expected_output": "Recommends to-tickets, marked [user], with /setup-matt-pocock-skills as a [user] prerequisite; notes it is user-only and missing from the live registry.",
+      "assertions": [
+        "Report recommends to-tickets",
+        "to-tickets invocation is marked [user]",
+        "Report lists /setup-matt-pocock-skills as a prerequisite, marked [user]",
+        "Report states that to-tickets is absent from the live registry or is user-only"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Which skill should I use to generate a Terraform module for an AWS VPC with Terragrunt wiring?",
+      "expected_output": "Verdict 'no suitable local route found' (no Terraform/IaC skill installed). States the missing capability and searched scope, notes no terraform/terragrunt CLI for validation, gives no invocation strings, and installs nothing.",
+      "assertions": [
+        "Verdict is 'no suitable local route found'",
+        "Report states the missing capability and the searched scope",
+        "Report has no invocation strings",
+        "Report notes the terraform/terragrunt CLIs are unavailable, so there is no validation loop",
+        "Nothing was installed"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Which skill should I use to compare skills? List the candidates you found with their source paths.",
+      "expected_output": "Verdict 'needs a concrete task'. Each skill under ~/.claude/skills appears once, deduplicated against its ~/.agents/skills target by resolved path. Distinguishes choosing a skill (this router) from benchmarking skills (skill-creator), and does not propose invoking which-framework as a further step.",
+      "assertions": [
+        "Verdict is 'needs a concrete task'",
+        "Candidate list has no duplicate entries for the same resolved path (symlink dedupe)",
+        "Report does not propose invoking which-framework as a further step",
+        "Report distinguishes the two meanings of 'compare skills' (choose for a task vs benchmark skills)"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Fix the null pointer in src/cart.js line 42.",
+      "should_trigger": false,
+      "expected_output": "which-framework is NOT invoked: this is a request to do work, not to choose a skill."
+    }
+  ]
+}

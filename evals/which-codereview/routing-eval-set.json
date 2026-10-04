@@ -1,0 +1,90 @@
+[
+ {
+  "query": "I've got a 600-line PR (#212) touching the billing webhook handler and the stripe client. there's /code-review, code-review-and-quality and security-review installed \u2014 which one should I actually run and at what depth?",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "does this branch even need a review? it's just a lockfile bump plus renaming a couple of env vars in deploy/prod.yaml",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "before I merge feature/oauth-pkce into main, help me figure out the right reviewer and effort level, I don't want to burn money on max if it's not needed",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "an agent ran overnight on my repo and produced 14 commits on agent/migrate-orm. nobody has read them. what review setup do you recommend \u2014 one pass or several?",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "how deep should the review be for my working tree changes? it's mostly CSS but one file in src/auth got touched",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "which code review skill fits best for a Rust crate change? I have a bunch of review skills installed and I'm not sure which ones understand rust",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "pick a reviewer for the diff since tag v3.1.0 \u2014 2 workspaces changed (api + web). don't run it, just tell me the command",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "I fixed the 3 findings from yesterday's review in the last two commits. what's the cheapest reasonable re-review?",
+  "expected": "which-codereview"
+ },
+ {
+  "query": "is a security review needed on top of normal code review for this payments refactor or is one enough? branch is pay/refactor-ledger",
+  "expected": "which-security-review"
+ },
+ {
+  "query": "review my changes",
+  "expected": "reviewer"
+ },
+ {
+  "query": "can you review the diff on this branch vs main and tell me if anything's broken? specifically worried about the retry logic in src/queue/worker.ts",
+  "expected": "reviewer"
+ },
+ {
+  "query": "run /code-review on PR 88 please",
+  "expected": "reviewer"
+ },
+ {
+  "query": "look over src/auth/session.js for security bugs, I think the refresh token rotation might be wrong",
+  "expected": "reviewer"
+ },
+ {
+  "query": "I got these review comments on my PR from a teammate, can you help me address them? they're about error handling in the upload controller",
+  "expected": "other"
+ },
+ {
+  "query": "simplify the code I just wrote in utils/date.ts, it feels overly clever",
+  "expected": "other"
+ },
+ {
+  "query": "which testing framework should I pick for a new Vite + React project, vitest or jest?",
+  "expected": "other"
+ },
+ {
+  "query": "write a CONTRIBUTING.md section explaining our code review process: two approvals, CI green, squash merge",
+  "expected": "other"
+ },
+ {
+  "query": "should I use the tdd skill or test-driven-development for adding a new endpoint? they look similar",
+  "expected": "which-framework"
+ },
+ {
+  "query": "set up a github action that runs eslint and posts review comments on PRs",
+  "expected": "other"
+ },
+ {
+  "query": "is this ready to ship? we're launching the signup flow to production on monday, what checklist should we go through",
+  "expected": "other"
+ },
+ {
+  "query": "ok the plan in docs/plans/billing-v2.md is approved. which skill or workflow should I use to actually start implementing it? there's like 4 that look relevant",
+  "expected": "which-framework"
+ },
+ {
+  "query": "does the terraform change in infra/iam.tf on branch ops/narrow-roles need a security review, and if so which one and how thorough?",
+  "expected": "which-security-review"
+ }
+]

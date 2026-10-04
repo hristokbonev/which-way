@@ -1,0 +1,22 @@
+[
+  {"query": "i have tdd and test-driven-development both installed from different repos and honestly can't tell them apart. which one should i be reaching for when adding the payment retry logic in services/billing?", "should_trigger": true},
+  {"query": "before I start on the CSV import feature in apps/admin (needs a parser, validation and a small upload UI), which of my installed skills should I chain together? don't start yet, just tell me the route", "should_trigger": true},
+  {"query": "is a skill even needed for renaming the getUser helper to fetchUser across 3 files, or should I just do it?", "should_trigger": true},
+  {"query": "we've got grill-me, grilling, interview-me AND grill-with-docs installed lol. for nailing down requirements on the new notifications service which one should I use", "should_trigger": true},
+  {"query": "Which workflow fits migrating our auth in api/ from express-session to JWT? There's a security angle and a migration angle and I can't tell if that's one skill or two.", "should_trigger": true},
+  {"query": "what's the right skill for the flaky e2e test in packages/web/tests/checkout.spec.ts that only fails on CI? diagnosing-bugs, debugging-and-error-recovery, or something else?", "should_trigger": true},
+  {"query": "I want to turn the Q3 multi-tenant epic into backlog tickets for the team, not build it now. Which of my skills is meant for that?", "should_trigger": true},
+  {"query": "compare spec-driven-development vs planning-and-task-breakdown for me - which fits a 2 day feature adding SSO to the dashboard?", "should_trigger": true},
+  {"query": "this PR adds a new /export endpoint, a db migration, and a React table in web/. should those go through different skills or one workflow? what's the plan", "should_trigger": true},
+  {"query": "do I need any special skill for bumping react 18 -> 19 in the marketing site, or is that just-do-it territory?", "should_trigger": true},
+  {"query": "use tdd to add a rate limiter to src/middleware/limit.ts, write the failing test first", "should_trigger": false},
+  {"query": "review my current branch for bugs before I open the PR against main", "should_trigger": false},
+  {"query": "which reviewer should I use for the diff on feature/payments, code-review or code-review-and-quality, and at what effort?", "should_trigger": false},
+  {"query": "should this change to server/config/cors.ts get a security review or is it fine to merge?", "should_trigger": false},
+  {"query": "find me a skill I can install for generating terraform modules", "should_trigger": false},
+  {"query": "I wrote a new skill at ~/.agents/skills/changelog-writer, can you run evals on it and tell me if its description triggers well", "should_trigger": false},
+  {"query": "npm test fails with ERR_MODULE_NOT_FOUND in packages/core since the ESM switch, can you figure out why", "should_trigger": false},
+  {"query": "what's the difference between a skill and a slash command in claude code?", "should_trigger": false},
+  {"query": "Fix the null pointer in src/cart.js line 42.", "should_trigger": false},
+  {"query": "write me a skill that picks the right deployment workflow for our monorepo (staging vs prod vs preview)", "should_trigger": false}
+]
