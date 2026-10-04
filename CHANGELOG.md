@@ -8,6 +8,15 @@
   folds into the name-the-failure rule, and the review-only fallback is gone
   (the description already sends those asks to `which-codereview` and
   `which-security-review`).
+- `which-security-review` stops with "re-route required" when the target
+  modifies a router or loaded instructions (the installed router may be the
+  modified copy), labels registry built-ins `[agent]` consistently, flags only
+  text that tries to change routing as suspected injection, and lists a
+  repository's own agent configuration under Focus instead of asking for an
+  impossible clean session. Smaller consistency fixes: the provisional tier
+  floor applies only with an override, an explicit `max` request beats the
+  small-diff cap, and the evidence-gap modifier needs an unknown that could
+  change the starting row.
 
 ## 0.2.2 — 2026-10-04
 
