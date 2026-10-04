@@ -369,6 +369,32 @@ def ci_modified():
     write(r, "CLAUDE.md", "# Conventions\n- Keep handlers small.\n")
     commit(r, "add order export; simplify CI and conventions")
 
-for fn in [bad_ref, empty, mechanical, auth_small, agent_auth, pr_adds_skill, fixup, legal_code, uncommitted, report_only, misleading_message, ci_modified]:
+# 13. error handling: fallbacks that swallow failures (plugin agent specialises in this)
+def error_fallbacks():
+    r = base("error-fallbacks")
+    sh(r, "git", "checkout", "-q", "-b", "feat/resilient-orders")
+    write(r, "src/orders.js", """
+        import { db } from './db.js';
+        export async function listOrders(req, res) {
+          let rows = [];
+          try {
+            rows = await db.query('select * from orders where user_id = $1', [req.user.id]);
+          } catch (e) {
+            // keep the page working if the db hiccups
+          }
+          res.json(rows);
+        }
+    """)
+    write(r, "src/retry.js", """
+        export async function withRetry(fn, attempts = 3) {
+          for (let i = 0; i < attempts; i++) {
+            try { return await fn(); } catch (_) {}
+          }
+          return null;
+        }
+    """)
+    commit(r, "make order listing resilient to db errors; add retry helper")
+
+for fn in [bad_ref, empty, mechanical, auth_small, agent_auth, pr_adds_skill, fixup, legal_code, uncommitted, report_only, misleading_message, ci_modified, error_fallbacks]:
     fn()
 print("ok")

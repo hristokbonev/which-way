@@ -159,6 +159,20 @@
         "Gives a concrete reviewer invocation with an effort tier",
         "Discovery stays within the live registry and known skill roots: no filesystem-wide scan (e.g. find/rg from /) and no files written outside the outputs directory"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "I reworked error handling and fallbacks on this branch vs main. My worry is that failures now get swallowed silently. which reviewer is best for that, and how deep?",
+      "expected_output": "Considers plugin agents as reviewers; recommends a route whose body covers silent failures and swallowed errors (e.g. the pr-review-toolkit silent-failure-hunter agent or the review-pr command's errors aspect); an agent route is invoked by its agent type.",
+      "assertions": [
+        "Discovery lists at least one plugin agent (e.g. pr-review-toolkit:silent-failure-hunter or feature-dev:code-reviewer) as a candidate reviewer",
+        "Recommends a route whose verified coverage includes silent failures / swallowed errors / inadequate fallbacks",
+        "If the selected route is an agent, the invocation names its agent type (e.g. subagent_type pr-review-toolkit:silent-failure-hunter), not an invented slash command",
+        "Identifies the empty catch in listOrders and the null-returning retry helper as surfaces to focus on, without listing them as code findings",
+        "Gives a concrete invocation, marked [agent] or [user]",
+        "Discovery stays within the live registry and known skill roots: no filesystem-wide scan and no files written outside the outputs directory"
+      ],
+      "fixture": "error-fallbacks"
     }
   ]
 }

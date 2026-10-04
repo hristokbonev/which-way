@@ -109,6 +109,17 @@
       "prompt": "Fix the null pointer in src/cart.js line 42.",
       "should_trigger": false,
       "expected_output": "which-framework is NOT invoked: this is a request to do work, not to choose a skill."
+    },
+    {
+      "id": 11,
+      "prompt": "Which skill should I use to get recommendations on which Claude Code hooks, subagents and skills to set up for this repo?",
+      "expected_output": "Recommends the claude-automation-recommender skill from the claude-code-setup plugin, invoked by its plugin-qualified name, with its body resolved under the plugin's installPath.",
+      "assertions": [
+        "Report recommends claude-automation-recommender (claude-code-setup plugin)",
+        "Invocation uses the plugin-qualified name /claude-code-setup:claude-automation-recommender, marked [agent]",
+        "Report does not call it user-only (its frontmatter has no disable-model-invocation; the match on line 188 is an example in the body)",
+        "The resolved path is under the plugin's installPath in ~/.claude/plugins/cache"
+      ]
     }
   ]
 }
