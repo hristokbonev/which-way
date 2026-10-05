@@ -40,5 +40,6 @@ ROUTING_CWD=$(mktemp -d) python3 run_routing.py 3
 | 4 (4 scenarios, after fresh review) | 12 | 96% (the 3 misses were a too-strict assertion, since loosened) |
 | 5 (2 new scenarios + 5-scenario regression, v0.2.1) | 11 | 10/11 runs perfect |
 | 6 (plugin discovery, v0.2.4: new error-fallbacks scenario) | 4 + 4 | all eight runs picked the `pr-review-toolkit:silent-failure-hunter` agent, old and new |
+| 7 (Step 1 measured by `scripts/measure.mjs`; all 13 scenarios) | 27 | 154/155 assertions; every run measured with the script, no state changes. Miss: misleading-commit-message flagged the unreplaced line in `verifyToken` but did not name it as the expiry check |
 
 Routing: 65/66 runs reached the expected skill.
