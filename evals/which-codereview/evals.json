@@ -19,7 +19,7 @@
       "expected_output": "Reports 'no changes to review'; no discovery/effort fields.",
       "assertions": [
         "Verdict is 'no changes to review' (or equivalent) backed by git command evidence",
-        "Checks untracked files (e.g. git ls-files --others --exclude-standard), not only tracked diffs",
+        "Checks untracked files (the measure script in working-tree or auto mode, or git ls-files --others --exclude-standard), not only tracked diffs",
         "Does not run reviewer discovery (no skill files listed or read) or report an effort tier"
       ],
       "fixture": "empty-diff"

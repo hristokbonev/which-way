@@ -131,7 +131,11 @@ async function diffSpec(cwd, target, { gh, fetch }) {
     const untracked = await untrackedFiles(cwd, target.excludeUntracked);
     const base = unbornBranch ? (await git(cwd, 'hash-object', '-t', 'tree', '/dev/null')).trim() : 'HEAD';
     const basis = unbornBranch ? 'empty tree' : 'HEAD';
-    return { args: [base], commits: null, untracked, target: { kind: 'working-tree', basis, unbornBranch } };
+    const index = {
+      staged: lines(await git(cwd, 'diff', '--cached', '--name-only', '-z')),
+      unstaged: lines(await git(cwd, 'diff', '--name-only', '-z')),
+    };
+    return { args: [base], commits: null, untracked, index, target: { kind: 'working-tree', basis, unbornBranch } };
   }
   throw new MeasureError('BAD_TARGET', `Unknown target: ${target.kind}`);
 }
@@ -221,6 +225,7 @@ async function measureTarget(cwd, target, deps = {}) {
     binary: entries.filter((entry) => entry.binary).map((entry) => entry.path),
     renames: entries.filter((entry) => entry.from).map(({ from, path }) => ({ from, to: path })),
     untracked: spec.untracked ?? null,
+    index: spec.index ?? null,
     commits: spec.commits,
     empty: entries.length === 0,
   };

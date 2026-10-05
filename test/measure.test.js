@@ -333,3 +333,21 @@ test('which-way measure gives the same result and exit codes as the script', asy
   assert.equal((await cli(['measure', 'nope'])).code, 2);
   assert.match((await cli(['--help'])).stdout, /measure/);
 });
+
+test('a working-tree target lists staged and unstaged paths beside the aggregate', async () => {
+  const { cwd, git, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  await write('b.txt', 'b\n');
+  await commit('base');
+  await write('a.txt', 'a\nstaged\n');
+  await git('add', 'a.txt');
+  await write('a.txt', 'a\nstaged\nthen edited\n');
+  await write('b.txt', 'b\nunstaged\n');
+  await write('c.txt', 'new\n');
+
+  const result = await measure({ cwd, target: { kind: 'working-tree' } });
+
+  assert.deepEqual(result.index, { staged: ['a.txt'], unstaged: ['a.txt', 'b.txt'] });
+  assert.equal(result.files, 3);
+  assert.equal((await measure({ cwd, target: { kind: 'staged' } })).index, null);
+});
