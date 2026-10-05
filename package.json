@@ -1,6 +1,6 @@
 {
   "name": "@hristobonev/which-way",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "A library of agent skills for choosing workflows and reviews",
   "license": "MIT",
   "repository": {

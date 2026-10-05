@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 — 2026-10-06
+
+### Added
+
+- `which-way measure` and the bundled `skills/which-codereview/scripts/measure.mjs`:
+  measure a review target (a fixed point, `--staged`, `--unstaged`,
+  `--working-tree`, `--pr <n>`, or automatic) and print JSON with file and
+  line counts, binary files, renames, untracked files, staged and unstaged
+  paths, commits, workspaces and reviewer inputs. Exit status 2 is an
+  unknown ref and 3 a PR commit that could not be fetched.
+
+### Changed
+
+- `which-codereview` Step 1 runs the measure script instead of spelling out
+  the git procedure. The procedure moves to `references/manual-measure.md`,
+  used when node 22+ is unavailable or an unstaged target should include
+  untracked files. Step 3's self-review exclusion starts from the script's
+  reviewer inputs.
+
 ## 0.2.4 — 2026-10-04
 
 ### Changed
