@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installSkills, listSkills } from './skills.js';
-import { runMeasure } from '../skills/which-codereview/scripts/measure.mjs';
 
 const packagePath = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
 const { version } = JSON.parse(readFileSync(packagePath, 'utf8'));
@@ -75,7 +74,11 @@ export async function runCli(args, { cwd, home, stdout, stderr }) {
       for (const { name, description } of listSkills()) stdout.write(`${name}\t${description}\n`);
       return 0;
     }
-    if (command === 'measure') return runMeasure(rest, { cwd, stdout, stderr });
+    if (command === 'measure') {
+      // Loaded on demand so a problem in the skill's script cannot break list or install.
+      const { runMeasure } = await import('../skills/which-codereview/scripts/measure.mjs');
+      return runMeasure(rest, { cwd, stdout, stderr });
+    }
     if (command !== 'install') throw new Error(`Unknown command: ${command}`);
 
     const options = parseInstall(rest);
