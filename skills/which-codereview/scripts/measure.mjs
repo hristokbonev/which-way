@@ -9,11 +9,15 @@ const run = promisify(execFile);
 // not configure its own review (which-codereview Step 3.6).
 const reviewerInputPatterns = [
   /(^|\/)\.(claude|agents)\/(skills|agents|commands|hooks)\//,
+  /(^|\/)SKILL\.md$/,
+  /(^|\/)(commands|agents)\/[^/]+\.md$/,
   /(^|\/)\.claude\/settings(\.local)?\.json$/,
   /(^|\/)(CLAUDE|AGENTS|CODING_STANDARDS)\.md$/,
   /(^|\/)\.mcp\.json$/,
   /^\.github\/workflows\//,
   /^\.gitlab-ci\.yml$/,
+  /^\.(circleci|buildkite)\//,
+  /^(Jenkinsfile|azure-pipelines\.yml)$/,
   /^\.husky\//,
   /^\.pre-commit-config\.yaml$/,
 ];
@@ -96,9 +100,18 @@ async function resolvePrCommit(cwd, oid, fetch, details) {
   try {
     return await resolveCommit(cwd, oid);
   } catch {
-    await fetch(details).catch(() => {});
+    try {
+      await fetch(details);
+    } catch (error) {
+      const reason = (error.stderr || error.message).trim();
+      throw new MeasureError('FETCH_FAILED', `Could not fetch PR #${details.number} ${details.side} ${oid}: ${reason}`);
+    }
     return resolveCommit(cwd, oid);
   }
+}
+
+async function countCommits(cwd, base, head) {
+  return Number((await git(cwd, 'rev-list', '--count', `${base}..${head}`)).trim());
 }
 
 async function hasHead(cwd) {
@@ -114,19 +127,27 @@ async function diffSpec(cwd, target, { gh, fetch }) {
   const unbornBranch = !(await hasHead(cwd));
   if (target.kind === 'range') {
     const base = await resolveCommit(cwd, target.base);
-    const commits = Number((await git(cwd, 'rev-list', '--count', `${base}..HEAD`)).trim());
-    return { args: [`${base}...HEAD`], commits, target: { kind: 'range', base, unbornBranch } };
+    const commits = await countCommits(cwd, base, 'HEAD');
+    const head = (await git(cwd, 'rev-parse', 'HEAD')).trim();
+    const basis = `merge-base of ${target.base} and HEAD`;
+    return { args: [`${base}...HEAD`], commits, target: { kind: 'range', base, head, basis, unbornBranch } };
   }
   if (target.kind === 'pr') {
     const number = target.number;
     const { baseRefOid, headRefOid } = JSON.parse(await gh(['pr', 'view', String(number), '--json', 'baseRefOid,headRefOid']));
     const base = await resolvePrCommit(cwd, baseRefOid, fetch, { number, oid: baseRefOid, side: 'base' });
     const head = await resolvePrCommit(cwd, headRefOid, fetch, { number, oid: headRefOid, side: 'head' });
-    const commits = Number((await git(cwd, 'rev-list', '--count', `${base}..${head}`)).trim());
-    return { args: [`${base}...${head}`], commits, target: { kind: 'pr', number, base, head, unbornBranch } };
+    const commits = await countCommits(cwd, base, head);
+    const basis = 'merge-base of PR base and head';
+    return { args: [`${base}...${head}`], commits, target: { kind: 'pr', number, base, head, basis, unbornBranch } };
   }
-  if (target.kind === 'staged') return { args: ['--cached'], commits: null, target: { kind: 'staged', unbornBranch } };
-  if (target.kind === 'unstaged') return { args: [], commits: null, target: { kind: 'unstaged', unbornBranch } };
+  if (target.kind === 'staged') {
+    const basis = unbornBranch ? 'index vs empty tree' : 'index vs HEAD';
+    return { args: ['--cached'], commits: null, target: { kind: 'staged', basis, unbornBranch } };
+  }
+  if (target.kind === 'unstaged') {
+    return { args: [], commits: null, target: { kind: 'unstaged', basis: 'working tree vs index', unbornBranch } };
+  }
   if (target.kind === 'working-tree') {
     const untracked = await untrackedFiles(cwd, target.excludeUntracked);
     const base = unbornBranch ? (await git(cwd, 'hash-object', '-t', 'tree', '/dev/null')).trim() : 'HEAD';
@@ -252,7 +273,7 @@ Options:
   --exclude-untracked <glob>   Leave matching untracked files out (repeatable)
   --cwd <path>                 Measure the repository at this path
 
-Exit status: 0 measured, 1 usage error, 2 unknown ref.
+Exit status: 0 measured, 1 usage error, 2 unknown ref, 3 PR commit could not be fetched.
 `;
 
 function optionValue(args, i, name, what) {
@@ -307,7 +328,7 @@ export async function runMeasure(args, { cwd, stdout, stderr }) {
     return 0;
   } catch (error) {
     stderr.write(`measure: ${error.message}\n`);
-    return error.code === 'BAD_REF' ? 2 : 1;
+    return { BAD_REF: 2, FETCH_FAILED: 3 }[error.code] ?? 1;
   }
 }
 

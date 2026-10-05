@@ -255,7 +255,9 @@ test('a PR is measured between its base and head, not against local HEAD', async
   const result = await measure({ cwd, target: { kind: 'pr', number: 42 }, gh });
 
   assert.deepEqual(calls, [['pr', 'view', '42', '--json', 'baseRefOid,headRefOid']]);
-  assert.deepEqual(result.target, { kind: 'pr', number: 42, base, head, unbornBranch: false });
+  assert.deepEqual(result.target, {
+    kind: 'pr', number: 42, base, head, basis: 'merge-base of PR base and head', unbornBranch: false,
+  });
   assert.equal(result.files, 2);
   assert.equal(result.added, 2);
   assert.equal(result.commits, 2);
@@ -398,4 +400,54 @@ test('option values cannot be another flag, and errors read like the rest of the
   assert.match(swallowed.stderr, /^measure: --exclude-untracked requires a glob\n$/);
   assert.match((await runScript(cwd, ['--bogus'])).stderr, /^measure: Unknown option: --bogus\n$/);
   assert.match((await runScript(cwd, ['--staged', '--unstaged'])).stderr, /^measure: Only one target may be given\n$/);
+});
+
+test('skill, plugin command and agent definitions and other CI systems are reviewer inputs', async () => {
+  const { cwd, git, write, commit } = await repo();
+  await write('src/app.js', 'x\n');
+  await commit('base');
+  await git('switch', '-q', '-c', 'feature');
+  for (const path of [
+    'skills/review/SKILL.md', 'plugins/kit/commands/audit.md', 'plugins/kit/agents/checker.md',
+    '.circleci/config.yml', 'Jenkinsfile', 'azure-pipelines.yml', '.buildkite/pipeline.yml',
+    'docs/agents/notes.txt', 'src/app.js',
+  ]) await write(path, 'new\n');
+  await commit('more reviewer inputs');
+
+  const result = await measure({ cwd, target: { kind: 'range', base: 'main' } });
+
+  assert.deepEqual(result.reviewerInputs, [
+    '.buildkite/pipeline.yml', '.circleci/config.yml', 'Jenkinsfile', 'azure-pipelines.yml',
+    'plugins/kit/agents/checker.md', 'plugins/kit/commands/audit.md', 'skills/review/SKILL.md',
+  ]);
+});
+
+test('a PR commit that cannot be fetched is a fetch failure, not an unknown ref', async () => {
+  const { cwd, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  const base = await commit('base');
+  const gh = async () => JSON.stringify({ baseRefOid: base, headRefOid: 'e'.repeat(40) });
+  const fetch = async () => { throw new Error('could not read from remote repository'); };
+
+  await assert.rejects(
+    measure({ cwd, target: { kind: 'pr', number: 7 }, gh, fetch }),
+    { code: 'FETCH_FAILED', message: /PR #7 head .*could not read from remote repository/ },
+  );
+});
+
+test('every target states what it was measured against', async () => {
+  const { cwd, git, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  await git('add', 'a.txt');
+  assert.equal((await measure({ cwd, target: { kind: 'staged' } })).target.basis, 'index vs empty tree');
+  await commit('base');
+  await git('switch', '-q', '-c', 'feature');
+  await write('a.txt', 'a\nb\n');
+  const head = await commit('work');
+
+  const range = await measure({ cwd, target: { kind: 'range', base: 'main' } });
+  assert.equal(range.target.head, head);
+  assert.equal(range.target.basis, 'merge-base of main and HEAD');
+  assert.equal((await measure({ cwd, target: { kind: 'staged' } })).target.basis, 'index vs HEAD');
+  assert.equal((await measure({ cwd, target: { kind: 'unstaged' } })).target.basis, 'working tree vs index');
 });
