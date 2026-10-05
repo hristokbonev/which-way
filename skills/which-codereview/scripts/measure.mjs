@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { posix } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -157,8 +158,8 @@ function comparisonBranch(cwd) {
   ]);
 }
 
-async function measureAuto(cwd) {
-  const tree = await measureTarget(cwd, { kind: 'working-tree' });
+async function measureAuto(cwd, excludeUntracked) {
+  const tree = await measureTarget(cwd, { kind: 'working-tree', excludeUntracked });
   tree.target.basis = `auto: uncommitted changes vs ${tree.target.basis}`;
   if (!tree.empty || tree.target.unbornBranch) return tree;
   const branch = await comparisonBranch(cwd);
@@ -190,13 +191,13 @@ function groupWorkspaces(root, paths) {
 }
 
 // Paths from git are relative to the repository root, so every command runs there.
-export async function measure({ cwd, target, gh, fetch }) {
+export async function measure({ cwd, target, excludeUntracked, gh, fetch }) {
   const root = (await git(cwd, 'rev-parse', '--show-toplevel')).trim();
   const deps = {
     gh: gh ?? ((args) => defaultGh(root, args)),
     fetch: fetch ?? ((details) => defaultFetch(root, details)),
   };
-  const { paths, touched, ...result } = target ? await measureTarget(root, target, deps) : await measureAuto(root);
+  const { paths, touched, ...result } = target ? await measureTarget(root, target, deps) : await measureAuto(root, excludeUntracked);
   const reviewerInputs = [...new Set(touched)]
     .filter((path) => reviewerInputPatterns.some((pattern) => pattern.test(path)))
     .sort();
@@ -223,4 +224,73 @@ async function measureTarget(cwd, target, deps = {}) {
     commits: spec.commits,
     empty: entries.length === 0,
   };
+}
+
+export const usage = `Usage: measure [<fixed-point> | --staged | --unstaged | --working-tree | --pr <n>] [options]
+
+Measures a review target and prints JSON. With no target, measures uncommitted
+changes, or the branch's unpushed commits when the working tree is clean.
+
+Targets:
+  <fixed-point>                Commits since the merge-base with this ref
+  --staged                     Index vs HEAD
+  --unstaged                   Working tree vs index
+  --working-tree               Working tree vs HEAD, plus untracked files
+  --pr <n>                     A GitHub PR's base...head (uses gh)
+
+Options:
+  --exclude-untracked <glob>   Leave matching untracked files out (repeatable)
+
+Exit status: 0 measured, 1 usage error, 2 unknown ref.
+`;
+
+function parseArgs(args) {
+  const flags = { '--staged': 'staged', '--unstaged': 'unstaged', '--working-tree': 'working-tree' };
+  let target;
+  const excludeUntracked = [];
+  const setTarget = (value) => {
+    if (target) throw new MeasureError('USAGE', 'only one target may be given');
+    target = value;
+  };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (flags[arg]) setTarget({ kind: flags[arg] });
+    else if (arg === '--pr') {
+      const number = Number(args[++i]);
+      if (!Number.isInteger(number) || number < 1) throw new MeasureError('USAGE', '--pr requires a PR number');
+      setTarget({ kind: 'pr', number });
+    } else if (arg === '--exclude-untracked') {
+      const pattern = args[++i];
+      if (!pattern) throw new MeasureError('USAGE', '--exclude-untracked requires a glob');
+      excludeUntracked.push(pattern);
+    } else if (arg.startsWith('-')) throw new MeasureError('USAGE', `unknown option: ${arg}`);
+    else setTarget({ kind: 'range', base: arg });
+  }
+  if (excludeUntracked.length && target && target.kind !== 'working-tree') {
+    throw new MeasureError('USAGE', '--exclude-untracked applies only to the working tree');
+  }
+  if (target?.kind === 'working-tree') target.excludeUntracked = excludeUntracked;
+  return { target, excludeUntracked };
+}
+
+export async function runMeasure(args, { cwd, stdout, stderr }) {
+  if (args.length === 1 && args[0] === '--help') {
+    stdout.write(usage);
+    return 0;
+  }
+  try {
+    const { target, excludeUntracked } = parseArgs(args);
+    const result = await measure({ cwd, target, excludeUntracked });
+    stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return 0;
+  } catch (error) {
+    stderr.write(`measure: ${error.message}\n`);
+    return error.code === 'BAD_REF' ? 2 : 1;
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = await runMeasure(process.argv.slice(2), {
+    cwd: process.cwd(), stdout: process.stdout, stderr: process.stderr,
+  });
 }

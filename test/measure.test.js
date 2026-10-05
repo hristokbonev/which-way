@@ -266,3 +266,70 @@ test('a PR is measured between its base and head, not against local HEAD', async
     { code: 'BAD_REF' },
   );
 });
+
+const script = new URL('../skills/which-codereview/scripts/measure.mjs', import.meta.url).pathname;
+
+async function runScript(cwd, args) {
+  try {
+    const { stdout, stderr } = await run(process.execPath, [script, ...args], { cwd });
+    return { code: 0, stdout, stderr };
+  } catch (error) {
+    return { code: error.code, stdout: error.stdout, stderr: error.stderr };
+  }
+}
+
+test('the script prints JSON and exits 2 on a bad ref, 1 on bad usage', async () => {
+  const { cwd, git, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  await commit('base');
+  await git('switch', '-q', '-c', 'feature');
+  await write('a.txt', 'a\nb\n');
+  await commit('edit');
+  await write('dist/x.js', 'x\n');
+  await write('new.txt', 'n\n');
+
+  const range = await runScript(cwd, ['main']);
+  assert.equal(range.code, 0, range.stderr);
+  assert.equal(JSON.parse(range.stdout).added, 1);
+
+  const tree = await runScript(cwd, ['--working-tree', '--exclude-untracked', 'dist/**']);
+  assert.deepEqual(JSON.parse(tree.stdout).untracked, { included: ['new.txt'], excluded: ['dist/x.js'] });
+
+  const bad = await runScript(cwd, ['nope']);
+  assert.equal(bad.code, 2);
+  assert.equal(bad.stdout, '');
+  assert.match(bad.stderr, /Unknown ref: nope/);
+
+  for (const args of [['--staged', '--unstaged'], ['--pr'], ['--bogus'], ['main', '--staged']]) {
+    const usage = await runScript(cwd, args);
+    assert.equal(usage.code, 1, args.join(' '));
+    assert.match(usage.stderr, /measure: /);
+  }
+});
+
+test('which-way measure gives the same result and exit codes as the script', async () => {
+  const { runCli } = await import('../src/cli.js');
+  const { cwd, git, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  await commit('base');
+  await git('switch', '-q', '-c', 'feature');
+  await write('a.txt', 'a\nb\n');
+  await commit('edit');
+
+  const cli = async (args) => {
+    let stdout = '';
+    let stderr = '';
+    const code = await runCli(args, {
+      cwd, home: cwd,
+      stdout: { write: (chunk) => { stdout += chunk; } },
+      stderr: { write: (chunk) => { stderr += chunk; } },
+    });
+    return { code, stdout, stderr };
+  };
+
+  const viaCli = await cli(['measure', 'main']);
+  assert.equal(viaCli.code, 0, viaCli.stderr);
+  assert.deepEqual(JSON.parse(viaCli.stdout), JSON.parse((await runScript(cwd, ['main'])).stdout));
+  assert.equal((await cli(['measure', 'nope'])).code, 2);
+  assert.match((await cli(['--help'])).stdout, /measure/);
+});
