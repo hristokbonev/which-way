@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { posix } from 'node:path';
+import { posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -140,38 +140,43 @@ async function diffSpec(cwd, target, { gh, fetch }) {
   throw new MeasureError('BAD_TARGET', `Unknown target: ${target.kind}`);
 }
 
-async function firstRef(cwd, candidates) {
-  for (const candidate of candidates) {
-    try {
-      return (await git(cwd, ...candidate)).trim();
-    } catch {
-      // try the next way of naming the comparison branch
-    }
+async function tryRef(cwd, args) {
+  try {
+    return (await git(cwd, ...args)).trim();
+  } catch {
+    return null;
   }
-  return null;
 }
 
-// The branch an unpushed range is measured against: upstream, then the remote's
-// default branch, then a local main or master.
-function comparisonBranch(cwd) {
-  return firstRef(cwd, [
+// Branches an unpushed range can be measured against, in order: upstream, then
+// the remote's default branch, then a local main or master. A pushed branch
+// matches its upstream, so the caller moves on to the next candidate.
+async function comparisonBranches(cwd) {
+  const candidates = [
     ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
     ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'],
     ['rev-parse', '--verify', '--quiet', '--abbrev-ref', 'main'],
     ['rev-parse', '--verify', '--quiet', '--abbrev-ref', 'master'],
-  ]);
+  ];
+  const branches = [];
+  for (const args of candidates) {
+    const branch = await tryRef(cwd, args);
+    if (branch && !branches.includes(branch)) branches.push(branch);
+  }
+  return branches;
 }
 
 async function measureAuto(cwd, excludeUntracked) {
   const tree = await measureTarget(cwd, { kind: 'working-tree', excludeUntracked });
   tree.target.basis = `auto: uncommitted changes vs ${tree.target.basis}`;
   if (!tree.empty || tree.target.unbornBranch) return tree;
-  const branch = await comparisonBranch(cwd);
-  if (!branch) return tree;
-  const range = await measureTarget(cwd, { kind: 'range', base: branch });
-  if (range.commits === 0) return tree;
-  range.target.basis = `auto: clean working tree; merge-base with ${branch}`;
-  return range;
+  for (const branch of await comparisonBranches(cwd)) {
+    const range = await measureTarget(cwd, { kind: 'range', base: branch });
+    if (range.commits === 0) continue;
+    range.target.basis = `auto: clean working tree; merge-base with ${branch}`;
+    return range;
+  }
+  return tree;
 }
 
 function nearestManifest(root, path) {
@@ -245,37 +250,45 @@ Targets:
 
 Options:
   --exclude-untracked <glob>   Leave matching untracked files out (repeatable)
+  --cwd <path>                 Measure the repository at this path
 
 Exit status: 0 measured, 1 usage error, 2 unknown ref.
 `;
 
+function optionValue(args, i, name, what) {
+  const value = args[i];
+  if (!value || value.startsWith('--')) throw new MeasureError('USAGE', `${name} requires ${what}`);
+  return value;
+}
+
 function parseArgs(args) {
   const flags = { '--staged': 'staged', '--unstaged': 'unstaged', '--working-tree': 'working-tree' };
   let target;
+  let cwd;
   const excludeUntracked = [];
   const setTarget = (value) => {
-    if (target) throw new MeasureError('USAGE', 'only one target may be given');
+    if (target) throw new MeasureError('USAGE', 'Only one target may be given');
     target = value;
   };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (flags[arg]) setTarget({ kind: flags[arg] });
     else if (arg === '--pr') {
-      const number = Number(args[++i]);
+      const number = Number(optionValue(args, ++i, '--pr', 'a PR number'));
       if (!Number.isInteger(number) || number < 1) throw new MeasureError('USAGE', '--pr requires a PR number');
       setTarget({ kind: 'pr', number });
+    } else if (arg === '--cwd') {
+      cwd = optionValue(args, ++i, '--cwd', 'a path');
     } else if (arg === '--exclude-untracked') {
-      const pattern = args[++i];
-      if (!pattern) throw new MeasureError('USAGE', '--exclude-untracked requires a glob');
-      excludeUntracked.push(pattern);
-    } else if (arg.startsWith('-')) throw new MeasureError('USAGE', `unknown option: ${arg}`);
+      excludeUntracked.push(optionValue(args, ++i, '--exclude-untracked', 'a glob'));
+    } else if (arg.startsWith('-')) throw new MeasureError('USAGE', `Unknown option: ${arg}`);
     else setTarget({ kind: 'range', base: arg });
   }
   if (excludeUntracked.length && target && target.kind !== 'working-tree') {
     throw new MeasureError('USAGE', '--exclude-untracked applies only to the working tree');
   }
   if (target?.kind === 'working-tree') target.excludeUntracked = excludeUntracked;
-  return { target, excludeUntracked };
+  return { target, excludeUntracked, cwd };
 }
 
 export async function runMeasure(args, { cwd, stdout, stderr }) {
@@ -284,8 +297,12 @@ export async function runMeasure(args, { cwd, stdout, stderr }) {
     return 0;
   }
   try {
-    const { target, excludeUntracked } = parseArgs(args);
-    const result = await measure({ cwd, target, excludeUntracked });
+    const options = parseArgs(args);
+    const result = await measure({
+      cwd: options.cwd ? resolve(cwd, options.cwd) : cwd,
+      target: options.target,
+      excludeUntracked: options.excludeUntracked,
+    });
     stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return 0;
   } catch (error) {

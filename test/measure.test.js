@@ -351,3 +351,51 @@ test('a working-tree target lists staged and unstaged paths beside the aggregate
   assert.equal(result.files, 3);
   assert.equal((await measure({ cwd, target: { kind: 'staged' } })).index, null);
 });
+
+test('auto falls back to the default branch when a pushed branch matches its upstream', async () => {
+  const origin = await mkdtemp(join(tmpdir(), 'which-way-origin-'));
+  await run('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+  const { cwd, git, write, commit } = await repo();
+  await git('remote', 'add', 'origin', origin);
+  await write('a.txt', 'a\n');
+  const main = await commit('base');
+  await git('push', '-q', 'origin', 'main');
+  await git('remote', 'set-head', 'origin', 'main');
+  await git('switch', '-q', '-c', 'feat');
+  await write('a.txt', 'a\nb\n');
+  await commit('work');
+  await git('push', '-q', '-u', 'origin', 'feat');
+
+  const result = await measure({ cwd });
+
+  assert.equal(result.empty, false);
+  assert.equal(result.target.kind, 'range');
+  assert.equal(result.target.base, main);
+  assert.match(result.target.basis, /merge-base with origin\/main/);
+  assert.equal(result.commits, 1);
+});
+
+test('--cwd measures another repository', async () => {
+  const { cwd, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  await commit('base');
+  await write('a.txt', 'a\nb\n');
+  const elsewhere = await mkdtemp(join(tmpdir(), 'which-way-elsewhere-'));
+
+  const result = await runScript(elsewhere, ['--unstaged', '--cwd', cwd]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).added, 1);
+  assert.equal((await runScript(elsewhere, ['--cwd'])).code, 1);
+});
+
+test('option values cannot be another flag, and errors read like the rest of the CLI', async () => {
+  const { cwd, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  await commit('base');
+
+  const swallowed = await runScript(cwd, ['--exclude-untracked', '--staged']);
+  assert.equal(swallowed.code, 1);
+  assert.match(swallowed.stderr, /^measure: --exclude-untracked requires a glob\n$/);
+  assert.match((await runScript(cwd, ['--bogus'])).stderr, /^measure: Unknown option: --bogus\n$/);
+  assert.match((await runScript(cwd, ['--staged', '--unstaged'])).stderr, /^measure: Only one target may be given\n$/);
+});
