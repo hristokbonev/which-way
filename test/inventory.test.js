@@ -89,3 +89,71 @@ test('plugin skills, commands and agents come from the installed version only', 
   assert.equal(byName(result, 'audit').source, 'plugin');
   assert.deepEqual(result.skipped, [{ path: join(kit, '1.0'), reason: 'stale plugin version' }]);
 });
+
+test('project settings override user settings, and shared names are reported as collisions', async () => {
+  const w = await world();
+  const { home, cwd, write, skill } = w;
+  await plugins(w, { 'code-review@market': '1.0' }, { 'code-review@market': true });
+  await write(join(home, '.claude/plugins/cache/market/code-review/1.0/commands/code-review.md'), '---\ndescription: PR review\n---\n');
+  await write(join(cwd, '.claude/settings.local.json'), JSON.stringify({ enabledPlugins: { 'code-review@market': false } }));
+  await skill(join(home, '.claude/skills'), 'code-review');
+
+  const result = await inventory({ home, cwd });
+
+  assert.equal(result.entries.find((e) => e.kind === 'command').enabled, false);
+  assert.deepEqual(result.collisions, [{ name: 'code-review', invokes: ['/code-review', '/code-review:code-review'] }]);
+});
+
+test('unreadable locations are reported as skipped and the rest is still listed', async () => {
+  const { home, cwd, skill } = await world();
+  const { chmod } = await import('node:fs/promises');
+  await skill(join(home, '.claude/skills'), 'fine');
+  await skill(join(home, '.agents/skills'), 'locked');
+  await chmod(join(home, '.agents/skills/locked'), 0o000);
+  await skill(join(cwd, '.claude/skills'), 'hidden');
+  await chmod(join(cwd, '.claude/skills'), 0o000);
+
+  try {
+    const result = await inventory({ home, cwd });
+    assert.deepEqual(result.entries.map((e) => e.name), ['fine']);
+    assert.deepEqual(result.skipped.map((s) => s.reason), ['unreadable', 'unreadable']);
+  } finally {
+    await chmod(join(home, '.agents/skills/locked'), 0o755);
+    await chmod(join(cwd, '.claude/skills'), 0o755);
+  }
+});
+
+test('the script and which-way inventory print the same JSON', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { runCli } = await import('../src/cli.js');
+  const { home, cwd, skill } = await world();
+  await skill(join(home, '.claude/skills'), 'tdd');
+  const script = new URL('../skills/which-framework/scripts/inventory.mjs', import.meta.url).pathname;
+
+  const { stdout } = await promisify(execFile)(process.execPath, [script], { cwd, env: { ...process.env, HOME: home } });
+  assert.deepEqual(JSON.parse(stdout).entries.map((e) => e.name), ['tdd']);
+
+  let viaCli = '';
+  const code = await runCli(['inventory'], {
+    cwd, home, stdout: { write: (chunk) => { viaCli += chunk; } }, stderr: { write: () => {} },
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(JSON.parse(viaCli), JSON.parse(stdout));
+
+  let errors = '';
+  const bad = await runCli(['inventory', '--bogus'], {
+    cwd, home, stdout: { write: () => {} }, stderr: { write: (chunk) => { errors += chunk; } },
+  });
+  assert.equal(bad, 1);
+  assert.match(errors, /^inventory: Unknown option: --bogus\n$/);
+});
+
+test('a description continued on indented lines is read in full', async () => {
+  const { home, cwd, write } = await world();
+  await write(join(home, '.claude/skills/plain/SKILL.md'),
+    '---\nname: plain\ndescription:\n  React composition patterns that scale. Use when\n  refactoring components.\nlicense: MIT\n---\n');
+
+  const result = await inventory({ home, cwd });
+  assert.equal(byName(result, 'plain').description, 'React composition patterns that scale. Use when refactoring components.');
+});

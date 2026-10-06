@@ -12,6 +12,7 @@ Commands:
   list                   List bundled skills
   install [skill]        Install all skills or one named skill
   measure [target]       Measure a review target as JSON (see: measure --help)
+  inventory              List installed skills, plugin commands and agents as JSON
 
 Install options:
   --claude               Use .claude/skills (default: .agents/skills)
@@ -73,6 +74,10 @@ export async function runCli(args, { cwd, home, stdout, stderr }) {
       if (rest.length) throw new Error('list accepts no arguments or options');
       for (const { name, description } of listSkills()) stdout.write(`${name}\t${description}\n`);
       return 0;
+    }
+    if (command === 'inventory') {
+      const { runInventory } = await import('../skills/which-framework/scripts/inventory.mjs');
+      return runInventory(rest, { cwd, home, stdout, stderr });
     }
     if (command === 'measure') {
       // Loaded on demand so a problem in the skill's script cannot break list or install.

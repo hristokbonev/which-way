@@ -1,8 +1,11 @@
 import { readdir, readFile, realpath } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Reads the leading `---` block of a definition file. Handles the shapes skill
-// and agent files use: `key: value`, quoted values, and `|` / `>` block scalars.
+// and agent files use: `key: value`, quoted values, `|` / `>` block scalars and
+// plain values continued on indented lines.
 export function parseFrontmatter(text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (!match) return {};
@@ -12,9 +15,10 @@ export function parseFrontmatter(text) {
     const row = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(rows[i]);
     if (!row) continue;
     let [, key, value] = row;
-    if (value === '|' || value === '>' || value === '|-' || value === '>-') {
+    if (['', '|', '>', '|-', '>-'].includes(value)) {
       const block = [];
       while (i + 1 < rows.length && /^\s+\S|^\s*$/.test(rows[i + 1])) block.push(rows[++i].trim());
+      // `|` keeps line breaks; `>` and a plain value continued on indented lines fold them.
       value = block.join(value.startsWith('|') ? '\n' : ' ').trim();
     } else if (/^(["']).*\1$/.test(value)) {
       value = value.slice(1, -1);
@@ -24,16 +28,31 @@ export function parseFrontmatter(text) {
   return fields;
 }
 
-async function directories(path) {
+const missing = new Set(['ENOENT', 'ENOTDIR']);
+const denied = new Set(['EACCES', 'EPERM']);
+
+// Runs a filesystem read; a missing path yields `fallback`, a denied one is
+// recorded in `skipped` and also yields `fallback`.
+async function attempt(read, path, fallback, skipped) {
   try {
+    return await read();
+  } catch (error) {
+    if (missing.has(error.code)) return fallback;
+    if (denied.has(error.code)) {
+      skipped.push({ path, reason: 'unreadable' });
+      return fallback;
+    }
+    throw error;
+  }
+}
+
+async function directories(path, skipped) {
+  return attempt(async () => {
     return (await readdir(path, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
       .map((entry) => entry.name)
       .sort();
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  }
+  }, path, [], skipped);
 }
 
 async function readJson(path) {
@@ -45,22 +64,12 @@ async function readJson(path) {
   }
 }
 
-async function files(path, extension) {
-  try {
-    return (await readdir(path)).filter((name) => name.endsWith(extension)).sort();
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  }
+async function files(path, extension, skipped) {
+  return attempt(async () => (await readdir(path)).filter((name) => name.endsWith(extension)).sort(), path, [], skipped);
 }
 
-async function readSkill(path) {
-  try {
-    return parseFrontmatter(await readFile(path, 'utf8'));
-  } catch (error) {
-    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null;
-    throw error;
-  }
+async function readDefinition(path, skipped) {
+  return attempt(async () => parseFrontmatter(await readFile(path, 'utf8')), dirname(path), null, skipped);
 }
 
 function entry(kind, name, fields, source, path, plugin = null) {
@@ -82,10 +91,10 @@ function entry(kind, name, fields, source, path, plugin = null) {
   };
 }
 
-async function skillRoot(root, source, plugin) {
+async function skillRoot(root, source, skipped, plugin) {
   const entries = [];
-  for (const folder of await directories(root)) {
-    const fields = await readSkill(join(root, folder, 'SKILL.md'));
+  for (const folder of await directories(root, skipped)) {
+    const fields = await readDefinition(join(root, folder, 'SKILL.md'), skipped);
     if (!fields) continue;
     const path = await realpath(join(root, folder, 'SKILL.md'));
     entries.push(entry('skill', fields.name || folder, fields, source, path, plugin));
@@ -94,11 +103,11 @@ async function skillRoot(root, source, plugin) {
 }
 
 // Plugin commands are named by their file; agents by frontmatter, falling back to the file.
-async function definitionFiles(root, kind, plugin) {
+async function definitionFiles(root, kind, skipped, plugin) {
   const entries = [];
-  for (const file of await files(root, '.md')) {
+  for (const file of await files(root, '.md', skipped)) {
     const path = join(root, file);
-    const fields = await readSkill(path);
+    const fields = await readDefinition(path, skipped);
     if (!fields) continue;
     const name = (kind === 'agent' && fields.name) || basename(file, '.md');
     entries.push(entry(kind, name, fields, 'plugin', await realpath(path), plugin));
@@ -126,11 +135,11 @@ async function pluginEntries(home, cwd, skipped) {
     const plugin = { name: key.split('@')[0], enabled: enabled[key] ?? null };
     for (const { installPath } of installs) {
       entries.push(
-        ...await skillRoot(join(installPath, 'skills'), 'plugin', plugin),
-        ...await definitionFiles(join(installPath, 'commands'), 'command', plugin),
-        ...await definitionFiles(join(installPath, 'agents'), 'agent', plugin),
+        ...await skillRoot(join(installPath, 'skills'), 'plugin', skipped, plugin),
+        ...await definitionFiles(join(installPath, 'commands'), 'command', skipped, plugin),
+        ...await definitionFiles(join(installPath, 'agents'), 'agent', skipped, plugin),
       );
-      for (const version of await directories(dirname(installPath))) {
+      for (const version of await directories(dirname(installPath), skipped)) {
         const path = join(dirname(installPath), version);
         if (path !== installPath) skipped.push({ path, reason: 'stale plugin version' });
       }
@@ -146,6 +155,14 @@ function dedupe(entries) {
   return entries.filter((entry) => !seen.has(entry.path) && seen.add(entry.path));
 }
 
+function collisions(entries) {
+  const byName = new Map();
+  for (const { name, invoke } of entries) byName.set(name, [...(byName.get(name) ?? []), invoke]);
+  return [...byName]
+    .filter(([, invokes]) => invokes.length > 1)
+    .map(([name, invokes]) => ({ name, invokes }));
+}
+
 export async function inventory({ home, cwd }) {
   const roots = [
     [join(home, '.claude/skills'), 'user'],
@@ -155,7 +172,37 @@ export async function inventory({ home, cwd }) {
   ];
   const entries = [];
   const skipped = [];
-  for (const [root, source] of roots) entries.push(...await skillRoot(root, source));
+  for (const [root, source] of roots) entries.push(...await skillRoot(root, source, skipped));
   entries.push(...await pluginEntries(home, cwd, skipped));
-  return { entries: dedupe(entries), skipped };
+  const unique = dedupe(entries);
+  return { entries: unique, collisions: collisions(unique), skipped };
+}
+
+export const usage = `Usage: inventory [--help]
+
+Lists the skills, plugin commands and agents installed for the current user and
+project as JSON: user and project skill folders (.claude/skills, .agents/skills)
+and each installed plugin's current version. Nothing is cached; every run reads
+the files as they are now.
+`;
+
+export async function runInventory(args, { cwd, home, stdout, stderr }) {
+  if (args.length === 1 && args[0] === '--help') {
+    stdout.write(usage);
+    return 0;
+  }
+  try {
+    if (args.length) throw new Error(`Unknown option: ${args[0]}`);
+    stdout.write(`${JSON.stringify(await inventory({ home, cwd }), null, 2)}\n`);
+    return 0;
+  } catch (error) {
+    stderr.write(`inventory: ${error.message}\n`);
+    return 1;
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = await runInventory(process.argv.slice(2), {
+    cwd: process.cwd(), home: homedir(), stdout: process.stdout, stderr: process.stderr,
+  });
 }
