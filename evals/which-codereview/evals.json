@@ -173,6 +173,19 @@
         "Discovery stays within the live registry and known skill roots: no filesystem-wide scan and no files written outside the outputs directory"
       ],
       "fixture": "error-fallbacks"
+    },
+    {
+      "id": 14,
+      "prompt": "I paired with Claude on this session refresh feature and read every change as it went in. which reviewer and what effort for this branch vs main?",
+      "expected_output": "Agent-written (trailer) but attended: no unattended-agent modifier, no isolation requirement; auth floor and verification gap still apply.",
+      "assertions": [
+        "Identifies the change as agent-written (from the commit trailer) but attended, because the user says they read every change",
+        "Does not apply the unattended-agent-work modifier, and states the supervision assumption",
+        "Does not require an isolated reviewer on the ground of unattended work",
+        "Still applies the auth/session review floor (medium or higher) and treats the missing tests as a verification gap",
+        "Report includes a Target line with the target type and Step 1 measurements (files, lines added/removed, workspaces, commits)"
+      ],
+      "fixture": "agent-auth-no-tests"
     }
   ]
 }
