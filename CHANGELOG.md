@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `which-framework` reports "no suitable local route found" when the
+  deliverable needs specialist knowledge of a technology no installed skill
+  covers and that technology's validation tool is unavailable; a
+  general-process skill is then named only as a fallback, without an
+  invocation.
+
 ## 0.4.2 — 2026-10-06
 
 ### Fixed

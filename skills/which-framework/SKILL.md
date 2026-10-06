@@ -84,6 +84,8 @@ Apply in order:
 
 Match capability to need: interviews to real unresolved decisions; research to lookup-able facts; executable plans to imminent implementation; tickets or specs to backlog work; debugging to reproduction and diagnosis; testing to the actual feedback loop. Check handoff rules — a skill that mandates implementation fits poorly when the user wants tickets for later.
 
+**No suitable local route.** When producing the deliverable itself needs specialist knowledge of a technology (a language, framework, platform, or tool) that no candidate's body covers, and that technology's own validation tool is unavailable here, the verdict is "no suitable local route found". A general-process skill (docs-first, test-first, incremental) is then a fallback, not a route: mention the closest one under remaining uncertainty, without an invocation. When the work is mostly process the general skill does supply (an upgrade checked against the changelog, a refactor under existing tests), route to it as usual.
+
 Routers are ordinary candidates. Recommend one only when its narrower selection prevents a named failure that direct comparison does not. Track every router visited or proposed in this routing session, and never route back to this skill or repeat one of them.
 
 Reviews: for a review link inside a chain, choose from verified reviewer capabilities at an effort sized to risk; don't assume a built-in command or a particular publisher's reviewer.

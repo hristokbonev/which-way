@@ -40,5 +40,6 @@ Use 3 runs each for scenarios 2–6 and 11, which are judgement-heavy, and 1 run
 | Tier 2 trim, scenarios 2 and 4 | 6 | 27/27 |
 | Plugin discovery (0.2.4), scenario 11 | 3 + 3 | all six runs recommended the plugin skill, old and new |
 | Discovery through `scripts/inventory.mjs` | 10 + 2 | 8/10 first pass: scenario 8 is the known failure; scenario 4 keyword-filtered the inventory and skipped `implement`/`implement-spec`, fixed by screening every entry: 2/2 then screened them |
+| No-suitable-route rule (2026-10-07) | 3 + 3 | scenario 8 3/3 now "no suitable local route found" with `source-driven-development` named only as a fallback; regressions 2, 4, 6 unchanged |
 
-Known failures in every version: scenario 8 routes to `source-driven-development` instead of "no suitable local route found"; scenario 6 runs often don't mark the route as conditional; when a mandatory reference is missing, scenario 2 runs sometimes run a filesystem-wide `find`.
+Known failures: scenario 6 runs often don't mark the route as conditional; when a mandatory reference is missing, scenario 2 runs sometimes run a filesystem-wide `find`.
