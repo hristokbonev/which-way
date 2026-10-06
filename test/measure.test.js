@@ -254,7 +254,7 @@ test('a PR is measured between its base and head, not against local HEAD', async
   };
   const result = await measure({ cwd, target: { kind: 'pr', number: 42 }, gh });
 
-  assert.deepEqual(calls, [['pr', 'view', '42', '--json', 'baseRefOid,headRefOid']]);
+  assert.deepEqual(calls, [['pr', 'view', '42', '--json', 'baseRefOid,headRefOid,url']]);
   assert.deepEqual(result.target, {
     kind: 'pr', number: 42, base, head, basis: 'merge-base of PR base and head', unbornBranch: false,
   });
@@ -450,4 +450,74 @@ test('every target states what it was measured against', async () => {
   assert.equal(range.target.basis, 'merge-base of main and HEAD');
   assert.equal((await measure({ cwd, target: { kind: 'staged' } })).target.basis, 'index vs HEAD');
   assert.equal((await measure({ cwd, target: { kind: 'unstaged' } })).target.basis, 'working tree vs index');
+});
+
+test('workspaces for a PR come from the measured head, not the checkout', async () => {
+  const { cwd, git, write, commit } = await repo();
+  await write('package.json', '{}\n');
+  await write('a.txt', 'a\n');
+  const base = await commit('base');
+  await git('switch', '-q', '-c', 'pr');
+  await write('apps/new/package.json', '{}\n');
+  await write('apps/new/index.js', 'x\n');
+  const head = await commit('new workspace');
+  await git('switch', '-q', 'main');
+
+  const gh = async () => JSON.stringify({ baseRefOid: base, headRefOid: head, url: 'https://github.com/acme/api/pull/3' });
+  const result = await measure({ cwd, target: { kind: 'pr', number: 3 }, gh });
+  assert.deepEqual(result.workspaces, [{ manifest: 'apps/new/package.json', files: 2 }]);
+});
+
+async function fakeGh(dir, json) {
+  const bin = join(dir, 'bin');
+  await mkdir(bin, { recursive: true });
+  await writeFile(join(bin, 'gh'), `#!/bin/sh\necho '${JSON.stringify(json)}'\n`, { mode: 0o755 });
+  return { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+}
+
+async function runScriptEnv(cwd, args, env) {
+  try {
+    const { stdout, stderr } = await run(process.execPath, [script, ...args], { cwd, env });
+    return { code: 0, stdout, stderr };
+  } catch (error) {
+    return { code: error.code, stdout: error.stdout, stderr: error.stderr };
+  }
+}
+
+test('a PR head is fetched from the remote that matches the PR repository', async () => {
+  const upstream = await repo();
+  await upstream.write('a.txt', 'a\n');
+  const base = await upstream.commit('base');
+  await upstream.git('switch', '-q', '-c', 'contrib');
+  await upstream.write('b.txt', 'b\n');
+  const head = await upstream.commit('contribution');
+  await upstream.git('update-ref', 'refs/pull/9/head', head);
+  const home = await mkdtemp(join(tmpdir(), 'which-way-remote-'));
+  const mirror = join(home, 'acme', 'api.git');
+  await mkdir(join(home, 'acme'), { recursive: true });
+  await run('git', ['clone', '-q', '--bare', '--mirror', upstream.cwd, mirror]);
+
+  const local = await repo();
+  await local.git('remote', 'add', 'origin', join(home, 'nowhere', 'fork.git'));
+  await local.git('remote', 'add', 'upstream', mirror);
+  await local.git('fetch', '-q', 'upstream', 'main');
+  await local.git('switch', '-q', '-c', 'main', 'upstream/main');
+
+  const env = await fakeGh(home, { baseRefOid: base, headRefOid: head, url: 'https://github.com/acme/api/pull/9' });
+  const result = await runScriptEnv(local.cwd, ['--pr', '9'], env);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).files, 1);
+});
+
+test('a PR commit that no remote can supply exits 3 from the command line', async () => {
+  const { cwd, git, write, commit } = await repo();
+  await write('a.txt', 'a\n');
+  const base = await commit('base');
+  const home = await mkdtemp(join(tmpdir(), 'which-way-nofetch-'));
+  await git('remote', 'add', 'origin', join(home, 'missing.git'));
+
+  const env = await fakeGh(home, { baseRefOid: base, headRefOid: 'd'.repeat(40), url: 'https://github.com/acme/api/pull/4' });
+  const result = await runScriptEnv(cwd, ['--pr', '4'], env);
+  assert.equal(result.code, 3);
+  assert.match(result.stderr, /^measure: Could not fetch PR #4 head/);
 });

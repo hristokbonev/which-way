@@ -61,15 +61,15 @@ function parseNumstat(output) {
   return entries;
 }
 
-function lines(output) {
+function splitNul(output) {
   return output.split('\0').filter(Boolean);
 }
 
 async function untrackedFiles(cwd, exclude = []) {
   const list = (...pathspec) => git(cwd, 'ls-files', '--others', '--exclude-standard', '-z', '--', ...pathspec);
-  const all = lines(await list());
+  const all = splitNul(await list());
   if (exclude.length === 0) return { included: all, excluded: [] };
-  const kept = new Set(lines(await list('.', ...exclude.map((pattern) => `:(exclude,glob)${pattern}`))));
+  const kept = new Set(splitNul(await list('.', ...exclude.map((pattern) => `:(exclude,glob)${pattern}`))));
   return { included: all.filter((path) => kept.has(path)), excluded: all.filter((path) => !kept.has(path)) };
 }
 
@@ -91,9 +91,22 @@ async function defaultGh(cwd, args) {
   return stdout;
 }
 
+// The remote whose URL names the PR's repository (owner/name), else origin.
+async function prRemote(cwd, url) {
+  const slug = /github\.com\/([^/]+\/[^/]+)\/pull\//.exec(url ?? '')?.[1];
+  if (slug) {
+    for (const row of (await git(cwd, 'remote', '-v')).split('\n')) {
+      const [name, remoteUrl] = row.split(/\s+/);
+      if (remoteUrl && remoteUrl.replace(/\.git$/, '').endsWith(slug)) return name;
+    }
+  }
+  return 'origin';
+}
+
 // A fork's PR head is not on any local branch; GitHub serves it as pull/<n>/head.
-async function defaultFetch(cwd, { number, oid, side }) {
-  await git(cwd, 'fetch', '--quiet', 'origin', side === 'head' ? `pull/${number}/head` : oid);
+async function defaultFetch(cwd, { number, oid, side, url }) {
+  const remote = await prRemote(cwd, url);
+  await git(cwd, 'fetch', '--quiet', remote, side === 'head' ? `pull/${number}/head` : oid);
 }
 
 async function resolvePrCommit(cwd, oid, fetch, details) {
@@ -134,9 +147,9 @@ async function diffSpec(cwd, target, { gh, fetch }) {
   }
   if (target.kind === 'pr') {
     const number = target.number;
-    const { baseRefOid, headRefOid } = JSON.parse(await gh(['pr', 'view', String(number), '--json', 'baseRefOid,headRefOid']));
-    const base = await resolvePrCommit(cwd, baseRefOid, fetch, { number, oid: baseRefOid, side: 'base' });
-    const head = await resolvePrCommit(cwd, headRefOid, fetch, { number, oid: headRefOid, side: 'head' });
+    const { baseRefOid, headRefOid, url } = JSON.parse(await gh(['pr', 'view', String(number), '--json', 'baseRefOid,headRefOid,url']));
+    const base = await resolvePrCommit(cwd, baseRefOid, fetch, { number, oid: baseRefOid, side: 'base', url });
+    const head = await resolvePrCommit(cwd, headRefOid, fetch, { number, oid: headRefOid, side: 'head', url });
     const commits = await countCommits(cwd, base, head);
     const basis = 'merge-base of PR base and head';
     return { args: [`${base}...${head}`], commits, target: { kind: 'pr', number, base, head, basis, unbornBranch } };
@@ -153,8 +166,8 @@ async function diffSpec(cwd, target, { gh, fetch }) {
     const base = unbornBranch ? (await git(cwd, 'hash-object', '-t', 'tree', '/dev/null')).trim() : 'HEAD';
     const basis = unbornBranch ? 'empty tree' : 'HEAD';
     const index = {
-      staged: lines(await git(cwd, 'diff', '--cached', '--name-only', '-z')),
-      unstaged: lines(await git(cwd, 'diff', '--name-only', '-z')),
+      staged: splitNul(await git(cwd, 'diff', '--cached', '--name-only', '-z')),
+      unstaged: splitNul(await git(cwd, 'diff', '--name-only', '-z')),
     };
     return { args: [base], commits: null, untracked, index, target: { kind: 'working-tree', basis, unbornBranch } };
   }
@@ -200,19 +213,29 @@ async function measureAuto(cwd, excludeUntracked) {
   return tree;
 }
 
-function nearestManifest(root, path) {
+// Manifest paths as of `head` when the measured commits may not be checked out,
+// else as they are on disk.
+async function manifestPaths(root, head) {
+  if (head) {
+    return new Set(splitNul(await git(root, 'ls-tree', '-r', '--name-only', '-z', head))
+      .filter((path) => manifests.includes(posix.basename(path))));
+  }
+  return { has: (path) => existsSync(posix.join(root, path)) };
+}
+
+function nearestManifest(present, path) {
   for (let directory = posix.dirname(path); ; directory = posix.dirname(directory)) {
     const prefix = directory === '.' ? '' : `${directory}/`;
-    const found = manifests.find((name) => existsSync(posix.join(root, prefix + name)));
+    const found = manifests.find((name) => present.has(prefix + name));
     if (found) return prefix + found;
     if (directory === '.') return null;
   }
 }
 
-function groupWorkspaces(root, paths) {
+function groupWorkspaces(present, paths) {
   const counts = new Map();
   for (const path of paths) {
-    const manifest = nearestManifest(root, path);
+    const manifest = nearestManifest(present, path);
     counts.set(manifest, (counts.get(manifest) ?? 0) + 1);
   }
   return [...counts]
@@ -231,7 +254,8 @@ export async function measure({ cwd, target, excludeUntracked, gh, fetch }) {
   const reviewerInputs = [...new Set(touched)]
     .filter((path) => reviewerInputPatterns.some((pattern) => pattern.test(path)))
     .sort();
-  return { ...result, workspaces: groupWorkspaces(root, paths), reviewerInputs };
+  const present = await manifestPaths(root, result.target.head);
+  return { ...result, workspaces: groupWorkspaces(present, paths), reviewerInputs };
 }
 
 async function measureTarget(cwd, target, deps = {}) {
