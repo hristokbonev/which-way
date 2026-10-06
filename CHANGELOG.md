@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `which-way inventory` and a bundled `scripts/inventory.mjs` in each router:
+  list the installed user, project and plugin skills, plugin commands and
+  agents as JSON, with real paths, user-only flags, plugin enabled state,
+  name collisions, and skipped stale plugin versions or unreadable folders.
+  Nothing is cached; every run reads the files as they are.
+
+### Changed
+
+- `which-codereview`, `which-security-review` and `which-framework` discover
+  candidates by running the inventory alongside the live registry and take
+  every file path from it, so they no longer read stale plugin versions. The
+  manual folder walk remains as the fallback without node.
+- `which-security-review`: a reviewer whose default target is a diff, branch
+  or PR no longer counts as accepting a repository, design or configuration
+  audit, so whole-repository audits route to a threat-modeling process.
+- `which-framework` screens every registry and inventory entry, user-only
+  ones included.
+
 ## 0.3.0 — 2026-10-06
 
 ### Added

@@ -57,5 +57,6 @@ ROUTING_CWD=$(mktemp -d) python3 run_routing.py 3
 | 5 (regression, after third fresh review) | 6 | 100% | evals 2, 3, 5, 6, 8, 9 |
 | 8 (fifth-review fixes) | 6 | consistent across runs | evals 11 (loop check) and 13 ×2, regression 2 and 6 |
 | 6–7 (0.2.3 fixes, after fourth review) | 12 | all assertions passed except the repo-audit tier split, fixed and rerun | new evals 11, 12; regression 2, 4, 6, 7, 8, 9 |
+| 9 (discovery through `scripts/inventory.mjs`) | 13 + 10 | 12/13 first pass; repo-audit (12) picked `feature-dev:code-reviewer` 3/3 (0.3.0 baseline split 1/2), fixed by ruling that a diff-first reviewer never accepts a repository target: 3/3 then chose `security-and-hardening` | eval 13 must read the router from `repo/skills/` (`skill_in_repo`) |
 
 Routing: 102/102 runs reached the expected skill.
