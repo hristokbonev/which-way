@@ -6,9 +6,12 @@
 
 - `which-way inventory` and a bundled `scripts/inventory.mjs` in each router:
   list the installed user, project and plugin skills, plugin commands and
-  agents as JSON, with real paths, user-only flags, plugin enabled state,
-  name collisions, and skipped stale plugin versions or unreadable folders.
-  Nothing is cached; every run reads the files as they are.
+  agents as JSON, with real paths, user-only flags, invocations, collisions
+  (invocations more than one definition answers to), and skipped locations:
+  plugins not enabled, stale plugin versions and unreadable folders. Project
+  skills are read from the repository root, plugin installs scoped to other
+  projects are ignored, and only plugins set to `true` in `enabledPlugins`
+  are listed. Nothing is cached; every run reads the files as they are.
 
 ### Changed
 

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readdir, readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -28,12 +29,14 @@ export function parseFrontmatter(text) {
   return fields;
 }
 
+
 const missing = new Set(['ENOENT', 'ENOTDIR']);
 const denied = new Set(['EACCES', 'EPERM']);
 
-// Runs a filesystem read; a missing path yields `fallback`, a denied one is
-// recorded in `skipped` and also yields `fallback`.
-async function attempt(read, path, fallback, skipped) {
+// Runs a filesystem read. A missing path yields `fallback`; a denied one is
+// recorded in `skipped` and also yields `fallback`, so one unreadable location
+// never hides the rest of the inventory.
+async function readOrSkip(read, path, fallback, skipped) {
   try {
     return await read();
   } catch (error) {
@@ -46,38 +49,30 @@ async function attempt(read, path, fallback, skipped) {
   }
 }
 
-async function directories(path, skipped) {
-  return attempt(async () => {
-    return (await readdir(path, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
-      .map((entry) => entry.name)
-      .sort();
-  }, path, [], skipped);
-}
+const listDirectories = (path, skipped) => readOrSkip(async () => (await readdir(path, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+  .map((entry) => entry.name)
+  .sort(), path, [], skipped);
 
-async function readJson(path) {
-  try {
-    return JSON.parse(await readFile(path, 'utf8'));
-  } catch (error) {
-    if (error.code === 'ENOENT') return null;
-    throw error;
-  }
-}
+const listMarkdown = (path, skipped) => readOrSkip(async () => (await readdir(path))
+  .filter((name) => name.endsWith('.md'))
+  .sort(), path, [], skipped);
 
-async function files(path, extension, skipped) {
-  return attempt(async () => (await readdir(path)).filter((name) => name.endsWith(extension)).sort(), path, [], skipped);
-}
+const readDefinition = (path, skipped) => readOrSkip(
+  async () => parseFrontmatter(await readFile(path, 'utf8')), dirname(path), null, skipped);
 
-async function readDefinition(path, skipped) {
-  return attempt(async () => parseFrontmatter(await readFile(path, 'utf8')), dirname(path), null, skipped);
-}
+const readJson = (path, skipped) => readOrSkip(
+  async () => JSON.parse(await readFile(path, 'utf8')), path, null, skipped);
 
-function entry(kind, name, fields, source, path, plugin = null) {
-  const invoke = {
-    skill: plugin ? `${plugin.name}:${name}` : `/${name}`,
-    command: `/${plugin?.name}:${name}`,
-    agent: `subagent_type: ${plugin?.name}:${name}`,
-  }[kind];
+// How each kind of definition is named and invoked. Plugin definitions are
+// namespaced by the plugin; only skills can live outside a plugin.
+const kinds = {
+  skill: { invoke: (name, plugin) => (plugin ? `/${plugin}:${name}` : `/${name}`) },
+  command: { invoke: (name, plugin) => `/${plugin}:${name}` },
+  agent: { invoke: (name, plugin) => `subagent_type: ${plugin}:${name}`, namedByFrontmatter: true },
+};
+
+function entry({ kind, name, fields, source, path, plugin = null }) {
   return {
     name,
     kind,
@@ -85,63 +80,82 @@ function entry(kind, name, fields, source, path, plugin = null) {
     source,
     path,
     userOnly: fields['disable-model-invocation'] === 'true',
-    plugin: plugin?.name ?? null,
-    enabled: plugin ? plugin.enabled : true,
-    invoke,
+    plugin,
+    invoke: kinds[kind].invoke(name, plugin),
   };
 }
 
 async function skillRoot(root, source, skipped, plugin) {
   const entries = [];
-  for (const folder of await directories(root, skipped)) {
-    const fields = await readDefinition(join(root, folder, 'SKILL.md'), skipped);
+  for (const folder of await listDirectories(root, skipped)) {
+    const file = join(root, folder, 'SKILL.md');
+    const fields = await readDefinition(file, skipped);
     if (!fields) continue;
-    const path = await realpath(join(root, folder, 'SKILL.md'));
-    entries.push(entry('skill', fields.name || folder, fields, source, path, plugin));
+    entries.push(entry({ kind: 'skill', name: fields.name || folder, fields, source, path: await realpath(file), plugin }));
   }
   return entries;
 }
 
-// Plugin commands are named by their file; agents by frontmatter, falling back to the file.
 async function definitionFiles(root, kind, skipped, plugin) {
   const entries = [];
-  for (const file of await files(root, '.md', skipped)) {
+  for (const file of await listMarkdown(root, skipped)) {
     const path = join(root, file);
     const fields = await readDefinition(path, skipped);
     if (!fields) continue;
-    const name = (kind === 'agent' && fields.name) || basename(file, '.md');
-    entries.push(entry(kind, name, fields, 'plugin', await realpath(path), plugin));
+    const name = (kinds[kind].namedByFrontmatter && fields.name) || basename(file, '.md');
+    entries.push(entry({ kind, name, fields, source: 'plugin', path: await realpath(path), plugin }));
   }
   return entries;
 }
 
+// The repository root: the nearest folder holding `.git`, else the folder itself.
+function projectRoot(cwd) {
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    if (dirname(dir) === dir) return cwd;
+  }
+}
+
 // enabledPlugins from user settings, overridden by the project's shared and local settings.
-async function enabledPlugins(home, cwd) {
+async function enabledPlugins({ home, project, skipped }) {
   const merged = {};
   for (const path of [
     join(home, '.claude/settings.json'),
-    join(cwd, '.claude/settings.json'),
-    join(cwd, '.claude/settings.local.json'),
-  ]) Object.assign(merged, (await readJson(path))?.enabledPlugins);
+    join(project, '.claude/settings.json'),
+    join(project, '.claude/settings.local.json'),
+  ]) Object.assign(merged, (await readJson(path, skipped))?.enabledPlugins);
   return merged;
 }
 
-// Only each record's installPath is current; sibling version folders are stale caches.
-async function pluginEntries(home, cwd, skipped) {
-  const records = (await readJson(join(home, '.claude/plugins/installed_plugins.json')))?.plugins ?? {};
-  const enabled = await enabledPlugins(home, cwd);
+// An install applies here when it is user-wide or scoped to this project.
+const appliesHere = (install, project) => !install.projectPath || install.projectPath === project;
+
+// Only plugins set to `true` in enabledPlugins count. Of an enabled plugin's
+// cached versions, those no applicable install points at are stale.
+async function pluginEntries(context) {
+  const { home, project, skipped } = context;
+  const records = (await readJson(join(home, '.claude/plugins/installed_plugins.json'), skipped))?.plugins ?? {};
+  const enabled = await enabledPlugins(context);
   const entries = [];
   for (const [key, installs] of Object.entries(records)) {
-    const plugin = { name: key.split('@')[0], enabled: enabled[key] ?? null };
-    for (const { installPath } of installs) {
+    const plugin = key.split('@')[0];
+    const current = installs.filter((install) => appliesHere(install, project)).map((install) => install.installPath);
+    if (enabled[key] !== true) {
+      for (const path of current) skipped.push({ path, reason: 'plugin not enabled' });
+      continue;
+    }
+    for (const installPath of current) {
       entries.push(
         ...await skillRoot(join(installPath, 'skills'), 'plugin', skipped, plugin),
         ...await definitionFiles(join(installPath, 'commands'), 'command', skipped, plugin),
         ...await definitionFiles(join(installPath, 'agents'), 'agent', skipped, plugin),
       );
-      for (const version of await directories(dirname(installPath), skipped)) {
-        const path = join(dirname(installPath), version);
-        if (path !== installPath) skipped.push({ path, reason: 'stale plugin version' });
+    }
+    const allInstalls = new Set(installs.map((install) => install.installPath));
+    for (const cacheDir of new Set(current.map((path) => dirname(path)))) {
+      for (const version of await listDirectories(cacheDir, skipped)) {
+        const path = join(cacheDir, version);
+        if (!allInstalls.has(path)) skipped.push({ path, reason: 'stale plugin version' });
       }
     }
   }
@@ -152,30 +166,31 @@ async function pluginEntries(home, cwd, skipped) {
 // file; keep the first listing of each real path.
 function dedupe(entries) {
   const seen = new Set();
-  return entries.filter((entry) => !seen.has(entry.path) && seen.add(entry.path));
+  return entries.filter((item) => !seen.has(item.path) && seen.add(item.path));
 }
 
+// Invocations that more than one definition answers to.
 function collisions(entries) {
-  const byName = new Map();
-  for (const { name, invoke } of entries) byName.set(name, [...(byName.get(name) ?? []), invoke]);
-  return [...byName]
-    .filter(([, invokes]) => invokes.length > 1)
-    .map(([name, invokes]) => ({ name, invokes }));
+  const byInvoke = new Map();
+  for (const { invoke, path } of entries) byInvoke.set(invoke, [...(byInvoke.get(invoke) ?? []), path]);
+  return [...byInvoke]
+    .filter(([, paths]) => paths.length > 1)
+    .map(([invoke, paths]) => ({ invoke, paths }));
 }
 
 export async function inventory({ home, cwd }) {
+  const context = { home, project: projectRoot(cwd), skipped: [] };
   const roots = [
     [join(home, '.claude/skills'), 'user'],
     [join(home, '.agents/skills'), 'user'],
-    [join(cwd, '.claude/skills'), 'project'],
-    [join(cwd, '.agents/skills'), 'project'],
+    [join(context.project, '.claude/skills'), 'project'],
+    [join(context.project, '.agents/skills'), 'project'],
   ];
   const entries = [];
-  const skipped = [];
-  for (const [root, source] of roots) entries.push(...await skillRoot(root, source, skipped));
-  entries.push(...await pluginEntries(home, cwd, skipped));
+  for (const [root, source] of roots) entries.push(...await skillRoot(root, source, context.skipped));
+  entries.push(...await pluginEntries(context));
   const unique = dedupe(entries);
-  return { entries: unique, collisions: collisions(unique), skipped };
+  return { entries: unique, collisions: collisions(unique), skipped: context.skipped };
 }
 
 export const usage = `Usage: inventory [--help]

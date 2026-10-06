@@ -76,6 +76,7 @@ export async function runCli(args, { cwd, home, stdout, stderr }) {
       return 0;
     }
     if (command === 'inventory') {
+      // Loaded on demand, like measure, so a problem in a skill's script cannot break list or install.
       const { runInventory } = await import('../skills/which-framework/scripts/inventory.mjs');
       return runInventory(rest, { cwd, home, stdout, stderr });
     }

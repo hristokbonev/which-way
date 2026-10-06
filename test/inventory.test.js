@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { chmod, mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { inventory } from '../skills/which-framework/scripts/inventory.mjs';
+import { runCli } from '../src/cli.js';
 
 async function world() {
   const root = await mkdtemp(join(tmpdir(), 'which-way-inventory-'));
@@ -32,7 +35,7 @@ test('user skills are listed with their description and invocation restrictions'
   assert.deepEqual(byName(result, 'tdd'), {
     name: 'tdd', kind: 'skill', description: 'tdd does things', source: 'user',
     path: join(home, '.claude/skills/tdd/SKILL.md'), userOnly: false,
-    plugin: null, enabled: true, invoke: '/tdd',
+    plugin: null, invoke: '/tdd',
   });
   assert.equal(byName(result, 'retro').userOnly, true);
 });
@@ -79,18 +82,20 @@ test('plugin skills, commands and agents come from the installed version only', 
 
   const result = await inventory({ home, cwd });
 
-  assert.deepEqual(result.entries.map((e) => [e.kind, e.name, e.plugin, e.enabled, e.invoke]), [
-    ['skill', 'helper', 'kit', true, 'kit:helper'],
-    ['command', 'audit', 'kit', true, '/kit:audit'],
-    ['agent', 'checker', 'kit', true, 'subagent_type: kit:checker'],
-    ['skill', 'dormant', 'off', false, 'off:dormant'],
+  assert.deepEqual(result.entries.map((e) => [e.kind, e.name, e.plugin, e.invoke]), [
+    ['skill', 'helper', 'kit', '/kit:helper'],
+    ['command', 'audit', 'kit', '/kit:audit'],
+    ['agent', 'checker', 'kit', 'subagent_type: kit:checker'],
   ]);
   assert.equal(byName(result, 'audit').description, 'Audit a PR');
   assert.equal(byName(result, 'audit').source, 'plugin');
-  assert.deepEqual(result.skipped, [{ path: join(kit, '1.0'), reason: 'stale plugin version' }]);
+  assert.deepEqual(result.skipped, [
+    { path: join(kit, '1.0'), reason: 'stale plugin version' },
+    { path: join(home, '.claude/plugins/cache/market/off/1.0'), reason: 'plugin not enabled' },
+  ]);
 });
 
-test('project settings override user settings, and shared names are reported as collisions', async () => {
+test('project settings can disable a plugin, and its entries are left out', async () => {
   const w = await world();
   const { home, cwd, write, skill } = w;
   await plugins(w, { 'code-review@market': '1.0' }, { 'code-review@market': true });
@@ -100,13 +105,12 @@ test('project settings override user settings, and shared names are reported as 
 
   const result = await inventory({ home, cwd });
 
-  assert.equal(result.entries.find((e) => e.kind === 'command').enabled, false);
-  assert.deepEqual(result.collisions, [{ name: 'code-review', invokes: ['/code-review', '/code-review:code-review'] }]);
+  assert.equal(result.entries.some((e) => e.kind === 'command'), false);
+  assert.deepEqual(result.collisions, []);
 });
 
 test('unreadable locations are reported as skipped and the rest is still listed', async () => {
   const { home, cwd, skill } = await world();
-  const { chmod } = await import('node:fs/promises');
   await skill(join(home, '.claude/skills'), 'fine');
   await skill(join(home, '.agents/skills'), 'locked');
   await chmod(join(home, '.agents/skills/locked'), 0o000);
@@ -124,9 +128,6 @@ test('unreadable locations are reported as skipped and the rest is still listed'
 });
 
 test('the script and which-way inventory print the same JSON', async () => {
-  const { execFile } = await import('node:child_process');
-  const { promisify } = await import('node:util');
-  const { runCli } = await import('../src/cli.js');
   const { home, cwd, skill } = await world();
   await skill(join(home, '.claude/skills'), 'tdd');
   const script = new URL('../skills/which-framework/scripts/inventory.mjs', import.meta.url).pathname;
@@ -159,11 +160,75 @@ test('a description continued on indented lines is read in full', async () => {
 });
 
 test('every router ships an identical copy of the inventory script', async () => {
-  const { readFile } = await import('node:fs/promises');
   const source = new URL('../skills/which-framework/scripts/inventory.mjs', import.meta.url);
   for (const skill of ['which-codereview', 'which-security-review']) {
     const copy = new URL(`../skills/${skill}/scripts/inventory.mjs`, import.meta.url);
     assert.equal(await readFile(copy, 'utf8'), await readFile(source, 'utf8'),
       `skills/${skill}/scripts/inventory.mjs differs; copy it from skills/which-framework/scripts/`);
+  }
+});
+
+test('a plugin missing from enabledPlugins is left out', async () => {
+  const w = await world();
+  await plugins(w, { 'quiet@market': '1.0' }, {});
+  await w.skill(join(w.home, '.claude/plugins/cache/market/quiet/1.0/skills'), 'hush');
+
+  const result = await inventory({ home: w.home, cwd: w.cwd });
+  assert.deepEqual(result.entries, []);
+  assert.deepEqual(result.skipped.map((s) => s.reason), ['plugin not enabled']);
+});
+
+test('project skills are found from a subfolder of the repository', async () => {
+  const { home, cwd, skill } = await world();
+  await mkdir(join(cwd, '.git'));
+  await skill(join(cwd, '.claude/skills'), 'deploy');
+  const sub = join(cwd, 'packages/api/src');
+  await mkdir(sub, { recursive: true });
+
+  const result = await inventory({ home, cwd: sub });
+  assert.deepEqual(result.entries.map((e) => `${e.source}:${e.name}`), ['project:deploy']);
+});
+
+test('installs scoped to another project are ignored and every current install is kept', async () => {
+  const { home, cwd, write, skill } = await world();
+  await mkdir(join(cwd, '.git'));
+  const cache = join(home, '.claude/plugins/cache/market/kit');
+  const record = (version, scope, projectPath) => ({ scope, installPath: join(cache, version), version, ...(projectPath && { projectPath }) });
+  await write(join(home, '.claude/plugins/installed_plugins.json'), JSON.stringify({ version: 2, plugins: {
+    'kit@market': [record('2.0', 'user'), record('3.0', 'project', cwd), record('4.0', 'project', '/elsewhere')],
+  } }));
+  await write(join(home, '.claude/settings.json'), JSON.stringify({ enabledPlugins: { 'kit@market': true } }));
+  for (const version of ['1.0', '2.0', '3.0', '4.0']) await skill(join(cache, version, 'skills'), `helper-${version}`);
+
+  const result = await inventory({ home, cwd });
+  assert.deepEqual(result.entries.map((e) => e.name), ['helper-2.0', 'helper-3.0']);
+  assert.deepEqual(result.skipped, [{ path: join(cache, '1.0'), reason: 'stale plugin version' }]);
+});
+
+test('collisions are invocations that more than one definition answers to', async () => {
+  const w = await world();
+  await plugins(w, { 'a@market': '1.0', 'b@market': '1.0' }, { 'a@market': true, 'b@market': true });
+  await w.write(join(w.home, '.claude/plugins/cache/market/a/1.0/agents/reviewer.md'), '---\nname: reviewer\n---\n');
+  await w.write(join(w.home, '.claude/plugins/cache/market/b/1.0/agents/reviewer.md'), '---\nname: reviewer\n---\n');
+  await w.skill(join(w.home, '.claude/skills'), 'tdd');
+  await w.skill(join(w.cwd, '.claude/skills'), 'tdd');
+
+  const result = await inventory({ home: w.home, cwd: w.cwd });
+  assert.deepEqual(result.collisions, [{ invoke: '/tdd', paths: [
+    join(w.home, '.claude/skills/tdd/SKILL.md'), join(w.cwd, '.claude/skills/tdd/SKILL.md'),
+  ] }]);
+});
+
+test('an unreadable settings file is reported, not fatal', async () => {
+  const w = await world();
+  await plugins(w, { 'kit@market': '1.0' }, { 'kit@market': true });
+  await w.skill(join(w.home, '.claude/skills'), 'tdd');
+  await chmod(join(w.home, '.claude/settings.json'), 0o000);
+  try {
+    const result = await inventory({ home: w.home, cwd: w.cwd });
+    assert.deepEqual(result.entries.map((e) => e.name), ['tdd']);
+    assert.ok(result.skipped.some((s) => s.reason === 'unreadable' && s.path.endsWith('settings.json')));
+  } finally {
+    await chmod(join(w.home, '.claude/settings.json'), 0o644);
   }
 });
