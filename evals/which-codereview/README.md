@@ -42,5 +42,6 @@ ROUTING_CWD=$(mktemp -d) python3 run_routing.py 3
 | 6 (plugin discovery, v0.2.4: new error-fallbacks scenario) | 4 + 4 | all eight runs picked the `pr-review-toolkit:silent-failure-hunter` agent, old and new |
 | 7 (Step 1 measured by `scripts/measure.mjs`; all 13 scenarios) | 27 | 154/155 assertions; every run measured with the script, no state changes. Miss: misleading-commit-message flagged the unreplaced line in `verifyToken` but did not name it as the expiry check |
 | 8 (discovery through `scripts/inventory.mjs`; all 13 scenarios) | 13 | verdicts and tiers match round 7 (pr-adds-skill rated high instead of medium; not asserted); every run that reached discovery ran the inventory and none read a stale plugin version |
+| 9 (attended agent work; new scenario 14) | 2 + 1 | scenario 14 2/2: trailer read as agent-written, user's "read every change" made it attended, no unattended modifier or isolation, still high for auth + test gap; scenario 5 still unattended with an isolated reviewer |
 
 Routing: 65/66 runs reached the expected skill.

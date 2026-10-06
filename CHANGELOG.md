@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `which-codereview` and `which-security-review` read an agent commit trailer
+  or branch name as agent-written, not automatically unattended: a change the
+  user says they followed, or one this session wrote with the user present, is
+  attended. Agent-written changes nobody vouches for still count as
+  unattended. In `which-security-review`, a change this session wrote still
+  prefers an isolated reviewer.
+
 ## 0.4.0 — 2026-10-06
 
 ### Added
