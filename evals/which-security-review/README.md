@@ -29,6 +29,8 @@ Regression suite for `skills/which-security-review`. Not published (`evals/` is 
 
 Assertions pin exact tiers and routes for this machine's installed skills (built-in `/security-review`, `security-and-hardening`), because consistency across runs is the goal.
 
+Route assertions name a capability (a dedicated reviewer that accepts the target type), not a specific tool, so enabling or disabling security plugins does not invalidate them. Run after a restart when plugins changed: a session only registers plugins enabled at startup.
+
 ## Behavior evals
 
 1. `python3 build_fixtures.py <workspace>/fixtures` (keep the workspace outside the repo).
@@ -59,5 +61,6 @@ ROUTING_CWD=$(mktemp -d) python3 run_routing.py 3
 | 6–7 (0.2.3 fixes, after fourth review) | 12 | all assertions passed except the repo-audit tier split, fixed and rerun | new evals 11, 12; regression 2, 4, 6, 7, 8, 9 |
 | 9 (discovery through `scripts/inventory.mjs`) | 13 + 10 | 12/13 first pass; repo-audit (12) picked `feature-dev:code-reviewer` 3/3 (0.3.0 baseline split 1/2), fixed by ruling that a diff-first reviewer never accepts a repository target: 3/3 then chose `security-and-hardening` | eval 13 must read the router from `repo/skills/` (`skill_in_repo`) |
 | 10 (attended agent work) | 1 | trailer-only scenario 4 still counted as unattended with a fresh-session reviewer; route changed to `code-modernization:security-auditor` because that plugin was enabled on 2026-10-06, so scenario 4's expected route needs revisiting for this skill set | |
+| 11 (route-agnostic re-baseline after enabling claude-security and code-modernization) | 17 | route assertions now require a dedicated reviewer that accepts the target (plus isolation for unattended work and correct [user]/subagent_type invocations) instead of naming `/security-review`; all 17 runs pass them. Per-scenario choice still varies between `/claude-security` and `code-modernization:security-auditor` (6, 7); the user's own preference belongs in /setup-which-way | run in a session where the plugins were registered at startup |
 
 Routing: 102/102 runs reached the expected skill.
