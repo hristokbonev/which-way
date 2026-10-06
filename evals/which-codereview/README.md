@@ -4,7 +4,7 @@ Regression suite for `skills/which-codereview`. Not published (`package.json` `f
 
 ## Files
 
-- `evals.json` — 13 behavior scenarios: prompt, fixture name, assertions.
+- `evals.json` — 15 behavior scenarios: prompt, fixture name, assertions.
 - `build_fixtures.py [out-dir]` — builds one git repo per scenario (default `./fixtures`). Every fixture wires `npm test`/`npm run build` to touch `.tests-ran`/`.build-ran`, so a router that runs them is detectable.
 - `check_state.sh <iteration-dir> <fixtures-dir> [start-marker]` — programmatic checks per run: tests/builds not run, `HEAD` and working-tree status unchanged, no writes to `~/.cache/which-codereview`.
 - `routing-eval-set.json` / `run_routing.py [runs] [set] [out]` — routing check across the real installed skill set. Each query is labelled with the skill it should reach (`which-codereview`, `which-security-review`, `which-framework`, `reviewer` = any non-router, `other`).
@@ -43,5 +43,6 @@ ROUTING_CWD=$(mktemp -d) python3 run_routing.py 3
 | 7 (Step 1 measured by `scripts/measure.mjs`; all 13 scenarios) | 27 | 154/155 assertions; every run measured with the script, no state changes. Miss: misleading-commit-message flagged the unreplaced line in `verifyToken` but did not name it as the expiry check |
 | 8 (discovery through `scripts/inventory.mjs`; all 13 scenarios) | 13 | verdicts and tiers match round 7 (pr-adds-skill rated high instead of medium; not asserted); every run that reached discovery ran the inventory and none read a stale plugin version |
 | 9 (attended agent work; new scenario 14) | 2 + 1 | scenario 14 2/2: trailer read as agent-written, user's "read every change" made it attended, no unattended modifier or isolation, still high for auth + test gap; scenario 5 still unattended with an isolated reviewer |
+| 10 (new scenario 15: pushed branch with upstream; scenario 11 reworded) | 2 + 1 | scenario 15 2/2: measured from the merge-base with origin/main, no remote contact, same route and tier both runs; scenario 11 named the unreplaced expiry line as a focus question |
 
 Routing: 65/66 runs reached the expected skill.
