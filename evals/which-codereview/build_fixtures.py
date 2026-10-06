@@ -395,6 +395,30 @@ def error_fallbacks():
     """)
     commit(r, "make order listing resilient to db errors; add retry helper")
 
-for fn in [bad_ref, empty, mechanical, auth_small, agent_auth, pr_adds_skill, fixup, legal_code, uncommitted, report_only, misleading_message, ci_modified, error_fallbacks]:
+# 15. pushed feature branch with an upstream, clean tree, no target named
+def pushed_branch():
+    r = base("pushed-branch")
+    origin = os.path.join(ROOT, "pushed-branch-origin.git")
+    shutil.rmtree(origin, ignore_errors=True)
+    sh(ROOT, "git", "init", "-q", "--bare", "-b", "main", origin)
+    sh(r, "git", "remote", "add", "origin", origin)
+    sh(r, "git", "push", "-q", "origin", "main")
+    sh(r, "git", "remote", "set-head", "origin", "main")
+    sh(r, "git", "checkout", "-q", "-b", "feat/order-export")
+    write(r, "src/export.js", """
+        import { db } from './db.js';
+        export async function exportOrders(req, res) {
+          const rows = await db.query('select id, total, created_at from orders where user_id = $1', [req.user.id]);
+          res.type('text/csv').send(rows.map((o) => `${o.id},${o.total},${o.created_at}`).join('\\n'));
+        }
+    """)
+    p = os.path.join(r, "src/server.js")
+    s = open(p).read().replace("import { listOrders } from './orders.js';", "import { listOrders } from './orders.js';\nimport { exportOrders } from './export.js';")
+    s = s.replace("  app.get('/orders', requireUser, listOrders);", "  app.get('/orders', requireUser, listOrders);\n  app.get('/orders/export', requireUser, exportOrders);")
+    open(p, "w").write(s)
+    commit(r, "add CSV order export")
+    sh(r, "git", "push", "-q", "-u", "origin", "feat/order-export")
+
+for fn in [bad_ref, empty, mechanical, auth_small, agent_auth, pr_adds_skill, fixup, legal_code, uncommitted, report_only, misleading_message, ci_modified, error_fallbacks, pushed_branch]:
     fn()
 print("ok")

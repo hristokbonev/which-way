@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `which-way measure --pr` groups changed files by the workspace manifests in
+  the PR's head commit, not the files on disk, and fetches a missing PR commit
+  from the remote whose URL matches the PR's repository instead of always
+  `origin`.
+
 ## 0.4.1 — 2026-10-06
 
 ### Changed

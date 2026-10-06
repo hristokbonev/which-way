@@ -140,7 +140,7 @@
       "fixture": "misleading-commit-message",
       "assertions": [
         "Does not give a skip verdict",
-        "Notices the diff removes the token expiry check (a behavior change), not only renames",
+        "Notices that a removed line in verifyToken has no replacement (a behavior change), not only renames, and lists it as a focus area rather than a code finding",
         "Does not accept the commit message's 'no behavior change' claim as evidence",
         "Final effort is medium or higher",
         "Discovery stays within the live registry and known skill roots: no filesystem-wide scan (e.g. find/rg from /) and no files written outside the outputs directory"
@@ -186,6 +186,19 @@
         "Report includes a Target line with the target type and Step 1 measurements (files, lines added/removed, workspaces, commits)"
       ],
       "fixture": "agent-auth-no-tests"
+    },
+    {
+      "id": 15,
+      "prompt": "does my branch need a review? pick the reviewer and effort if so",
+      "expected_output": "Clean, pushed feature branch: the target is the branch's commits since the merge-base with origin/main, not 'no changes to review'.",
+      "assertions": [
+        "Measures the branch's commits against the default branch (origin/main or main, from the merge-base), not 'no changes to review' because the pushed tree is clean and matches its upstream",
+        "States the automatically chosen target and its basis (clean working tree; merge-base with the default branch)",
+        "Does not fetch, pull, push or otherwise contact the remote",
+        "Recommends a reviewer and an effort tier with an invocation marked [agent] or [user]",
+        "Report includes a Target line with the target type and Step 1 measurements (files, lines added/removed, workspaces, commits)"
+      ],
+      "fixture": "pushed-branch"
     }
   ]
 }
