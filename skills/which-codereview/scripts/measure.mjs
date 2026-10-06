@@ -136,42 +136,46 @@ async function hasHead(cwd) {
   }
 }
 
-async function diffSpec(cwd, target, { gh, fetch }) {
-  const unbornBranch = !(await hasHead(cwd));
-  if (target.kind === 'range') {
+// How each target kind is diffed. `io` holds the injectable gh and fetch calls.
+const targetSpecs = {
+  async range(cwd, target, { unbornBranch }) {
     const base = await resolveCommit(cwd, target.base);
     const commits = await countCommits(cwd, base, 'HEAD');
     const head = (await git(cwd, 'rev-parse', 'HEAD')).trim();
     const basis = `merge-base of ${target.base} and HEAD`;
     return { args: [`${base}...HEAD`], commits, target: { kind: 'range', base, head, basis, unbornBranch } };
-  }
-  if (target.kind === 'pr') {
-    const number = target.number;
-    const { baseRefOid, headRefOid, url } = JSON.parse(await gh(['pr', 'view', String(number), '--json', 'baseRefOid,headRefOid,url']));
-    const base = await resolvePrCommit(cwd, baseRefOid, fetch, { number, oid: baseRefOid, side: 'base', url });
-    const head = await resolvePrCommit(cwd, headRefOid, fetch, { number, oid: headRefOid, side: 'head', url });
+  },
+  async pr(cwd, { number }, { unbornBranch, io }) {
+    const { baseRefOid, headRefOid, url } = JSON.parse(await io.gh(['pr', 'view', String(number), '--json', 'baseRefOid,headRefOid,url']));
+    const base = await resolvePrCommit(cwd, baseRefOid, io.fetch, { number, oid: baseRefOid, side: 'base', url });
+    const head = await resolvePrCommit(cwd, headRefOid, io.fetch, { number, oid: headRefOid, side: 'head', url });
     const commits = await countCommits(cwd, base, head);
     const basis = 'merge-base of PR base and head';
     return { args: [`${base}...${head}`], commits, target: { kind: 'pr', number, base, head, basis, unbornBranch } };
-  }
-  if (target.kind === 'staged') {
+  },
+  async staged(cwd, target, { unbornBranch }) {
     const basis = unbornBranch ? 'index vs empty tree' : 'index vs HEAD';
     return { args: ['--cached'], commits: null, target: { kind: 'staged', basis, unbornBranch } };
-  }
-  if (target.kind === 'unstaged') {
+  },
+  async unstaged(cwd, target, { unbornBranch }) {
     return { args: [], commits: null, target: { kind: 'unstaged', basis: 'working tree vs index', unbornBranch } };
-  }
-  if (target.kind === 'working-tree') {
+  },
+  async 'working-tree'(cwd, target, { unbornBranch }) {
     const untracked = await untrackedFiles(cwd, target.excludeUntracked);
     const base = unbornBranch ? (await git(cwd, 'hash-object', '-t', 'tree', '/dev/null')).trim() : 'HEAD';
     const basis = unbornBranch ? 'empty tree' : 'HEAD';
-    const index = {
+    const sides = {
       staged: splitNul(await git(cwd, 'diff', '--cached', '--name-only', '-z')),
       unstaged: splitNul(await git(cwd, 'diff', '--name-only', '-z')),
     };
-    return { args: [base], commits: null, untracked, index, target: { kind: 'working-tree', basis, unbornBranch } };
-  }
-  throw new MeasureError('BAD_TARGET', `Unknown target: ${target.kind}`);
+    return { args: [base], commits: null, untracked, index: sides, target: { kind: 'working-tree', basis, unbornBranch } };
+  },
+};
+
+async function diffSpec(cwd, target, io) {
+  const build = targetSpecs[target.kind];
+  if (!build) throw new MeasureError('BAD_TARGET', `Unknown target: ${target.kind}`);
+  return build(cwd, target, { unbornBranch: !(await hasHead(cwd)), io });
 }
 
 async function tryRef(cwd, args) {
@@ -200,7 +204,7 @@ async function comparisonBranches(cwd) {
   return branches;
 }
 
-async function measureAuto(cwd, excludeUntracked) {
+async function measureAuto(cwd, { excludeUntracked }) {
   const tree = await measureTarget(cwd, { kind: 'working-tree', excludeUntracked });
   tree.target.basis = `auto: uncommitted changes vs ${tree.target.basis}`;
   if (!tree.empty || tree.target.unbornBranch) return tree;
@@ -244,13 +248,16 @@ function groupWorkspaces(present, paths) {
 }
 
 // Paths from git are relative to the repository root, so every command runs there.
-export async function measure({ cwd, target, excludeUntracked, gh, fetch }) {
+// `target` defaults to auto: uncommitted changes, else the branch's unpushed commits.
+export async function measure({ cwd, target = { kind: 'auto' }, gh, fetch }) {
   const root = (await git(cwd, 'rev-parse', '--show-toplevel')).trim();
-  const deps = {
+  const io = {
     gh: gh ?? ((args) => defaultGh(root, args)),
     fetch: fetch ?? ((details) => defaultFetch(root, details)),
   };
-  const { paths, touched, ...result } = target ? await measureTarget(root, target, deps) : await measureAuto(root, excludeUntracked);
+  const { paths, touched, ...result } = target.kind === 'auto'
+    ? await measureAuto(root, target)
+    : await measureTarget(root, target, io);
   const reviewerInputs = [...new Set(touched)]
     .filter((path) => reviewerInputPatterns.some((pattern) => pattern.test(path)))
     .sort();
@@ -258,8 +265,8 @@ export async function measure({ cwd, target, excludeUntracked, gh, fetch }) {
   return { ...result, workspaces: groupWorkspaces(present, paths), reviewerInputs };
 }
 
-async function measureTarget(cwd, target, deps = {}) {
-  const spec = await diffSpec(cwd, target, deps);
+async function measureTarget(cwd, target, io = {}) {
+  const spec = await diffSpec(cwd, target, io);
   const entries = parseNumstat(await git(cwd, 'diff', '--numstat', '-z', '-M', ...spec.args));
   for (const path of spec.untracked?.included ?? []) entries.push(await measureUntracked(cwd, path));
   const added = entries.reduce((sum, entry) => sum + entry.added, 0);
@@ -329,11 +336,12 @@ function parseArgs(args) {
     } else if (arg.startsWith('-')) throw new MeasureError('USAGE', `Unknown option: ${arg}`);
     else setTarget({ kind: 'range', base: arg });
   }
-  if (excludeUntracked.length && target && target.kind !== 'working-tree') {
+  target ??= { kind: 'auto' };
+  if (excludeUntracked.length && !['auto', 'working-tree'].includes(target.kind)) {
     throw new MeasureError('USAGE', '--exclude-untracked applies only to the working tree');
   }
-  if (target?.kind === 'working-tree') target.excludeUntracked = excludeUntracked;
-  return { target, excludeUntracked, cwd };
+  if (excludeUntracked.length) target.excludeUntracked = excludeUntracked;
+  return { target, cwd };
 }
 
 export async function runMeasure(args, { cwd, stdout, stderr }) {
@@ -346,7 +354,6 @@ export async function runMeasure(args, { cwd, stdout, stderr }) {
     const result = await measure({
       cwd: options.cwd ? resolve(cwd, options.cwd) : cwd,
       target: options.target,
-      excludeUntracked: options.excludeUntracked,
     });
     stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return 0;
