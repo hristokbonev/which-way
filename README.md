@@ -49,3 +49,17 @@ npx @hristobonev/which-way measure --help
 ```
 
 It prints JSON and needs Node.js 22 or later.
+
+## List installed skills
+
+The routers find candidates with a bundled inventory script. The same listing is
+available from the command line:
+
+```sh
+npx @hristobonev/which-way inventory
+```
+
+It prints JSON: every user, project and enabled-plugin skill, plugin command
+and agent, with its real path and invocation, plus invocation collisions and
+skipped locations (plugins not enabled, stale plugin versions, unreadable
+folders). Nothing is cached.
