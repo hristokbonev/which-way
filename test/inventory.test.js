@@ -157,3 +157,13 @@ test('a description continued on indented lines is read in full', async () => {
   const result = await inventory({ home, cwd });
   assert.equal(byName(result, 'plain').description, 'React composition patterns that scale. Use when refactoring components.');
 });
+
+test('every router ships an identical copy of the inventory script', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = new URL('../skills/which-framework/scripts/inventory.mjs', import.meta.url);
+  for (const skill of ['which-codereview', 'which-security-review']) {
+    const copy = new URL(`../skills/${skill}/scripts/inventory.mjs`, import.meta.url);
+    assert.equal(await readFile(copy, 'utf8'), await readFile(source, 'utf8'),
+      `skills/${skill}/scripts/inventory.mjs differs; copy it from skills/which-framework/scripts/`);
+  }
+});

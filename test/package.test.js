@@ -25,6 +25,7 @@ test('npm tarball installs and runs without repository files', async () => {
   assert.ok(entries.includes('README.md'));
   for (const name of names) assert.ok(entries.includes(`skills/${name}/SKILL.md`));
   assert.ok(entries.includes('skills/which-codereview/scripts/measure.mjs'));
+  for (const name of names) assert.ok(entries.includes(`skills/${name}/scripts/inventory.mjs`));
   assert.ok(entries.includes('skills/which-codereview/references/manual-measure.md'));
   assert.ok(entries.every((entry) => !entry.startsWith('test/') && !entry.startsWith('docs/') && !entry.includes('.git/')));
 
